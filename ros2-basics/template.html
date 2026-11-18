@@ -1,0 +1,358 @@
+<title>ROS 2 Tutorial Additions</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Condensed:wght@500;600&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
+<style>
+/* Layout: a sticky checklist rail of the gaps beside one column of paste cards; stacks on phones. */
+:root {
+  --bg: #f6f7f5;
+  --surface: #ffffff;
+  --ink: #1d2320;
+  --muted: #5e6a64;
+  --line: #d9dfdb;
+  --accent: #1f6f5c;      /* ROS-ish teal-green, used for actions */
+  --accent-ink: #ffffff;
+  --code-bg: #eef1ef;
+  --done: #2d7a3e;
+  --where-bg: #e7f0ec;
+  --font-body: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", system-ui, sans-serif;
+  --font-label: "IBM Plex Sans Condensed", "Noto Sans TC", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #141917; --surface: #1c2320; --ink: #e4ebe7; --muted: #9aa8a1; --line: #2f3a35;
+    --accent: #5cc3a6; --accent-ink: #0f1a16; --code-bg: #232c28; --done: #6fcf82; --where-bg: #20302a;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #141917; --surface: #1c2320; --ink: #e4ebe7; --muted: #9aa8a1; --line: #2f3a35;
+  --accent: #5cc3a6; --accent-ink: #0f1a16; --code-bg: #232c28; --done: #6fcf82; --where-bg: #20302a;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 15px; line-height: 1.65;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 28px 64px;
+}
+.wrap { max-width: 1120px; margin: 0 auto; display: grid; grid-template-columns: 240px minmax(0, 1fr); gap: 32px; }
+header.top { grid-column: 1 / -1; display: grid; gap: 10px; }
+h1 { font-family: var(--font-label); font-weight: 600; font-size: 28px; line-height: 1.2; margin: 0; text-wrap: balance; letter-spacing: .01em; }
+.lede { color: var(--muted); max-width: 70ch; margin: 0; }
+.how { display: flex; flex-wrap: wrap; gap: 8px 20px; padding: 0; margin: 4px 0 0; list-style: none; color: var(--muted); font-size: 14px; }
+.how li { display: flex; gap: 8px; }
+.how b { font-family: var(--font-label); color: var(--accent); }
+
+nav.rail { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 16px); align-self: start; display: grid; gap: 4px; }
+.rail .label { font-family: var(--font-label); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin-bottom: 4px; }
+.rail a { display: grid; grid-template-columns: 22px minmax(0, 1fr); gap: 8px; align-items: baseline; padding: 6px 8px; border-radius: 6px; color: var(--ink); text-decoration: none; font-size: 14px; line-height: 1.35; }
+.rail a:hover, .rail a:focus-visible { background: var(--where-bg); outline: none; }
+.rail .mark { font-family: var(--font-mono); font-size: 12px; color: var(--muted); }
+.rail a.is-done .mark { color: var(--done); }
+.rail a.is-done .t { color: var(--muted); text-decoration: line-through; }
+.rail .count { margin-top: 10px; font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+main { display: grid; gap: 28px; min-width: 0; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; min-width: 0; scroll-margin-top: 16px; }
+.card-head { display: grid; gap: 10px; padding: 16px 20px; border-bottom: 1px solid var(--line); }
+.card-head .row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; }
+.id { font-family: var(--font-label); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.card-head h2 { margin: 2px 0 0; font-family: var(--font-label); font-weight: 600; font-size: 20px; line-height: 1.3; }
+.where { background: var(--where-bg); border-radius: 6px; padding: 8px 12px; font-size: 14px; line-height: 1.5; }
+.where b { font-weight: 700; }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+button { font: 500 14px/1 var(--font-label); letter-spacing: .02em; border-radius: 6px; padding: 9px 14px; cursor: pointer; border: 1px solid var(--accent); }
+button.primary { background: var(--accent); color: var(--accent-ink); }
+button.secondary { background: transparent; color: var(--accent); }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.done-toggle { display: inline-flex; gap: 6px; align-items: center; font-size: 14px; color: var(--muted); cursor: pointer; }
+.done-toggle input { width: 16px; height: 16px; accent-color: var(--done); }
+.status { font-size: 13px; color: var(--done); min-height: 1em; }
+
+.preview { padding: 8px 20px 20px; min-width: 0; }
+.preview h2 { font-size: 22px; margin: 18px 0 8px; line-height: 1.3; }
+.preview h3 { font-size: 17px; margin: 20px 0 6px; line-height: 1.35; }
+.preview p, .preview li { max-width: 72ch; }
+.preview code { font-family: var(--font-mono); font-size: .88em; background: var(--code-bg); padding: 1px 5px; border-radius: 4px; }
+.preview pre { background: var(--code-bg); border-radius: 6px; padding: 12px 14px; overflow-x: auto; font-size: 13px; line-height: 1.55; }
+.preview pre code { background: none; padding: 0; font-size: inherit; }
+.preview blockquote { margin: 12px 0; padding: 4px 14px; border-left: 3px solid var(--line); color: var(--muted); }
+.preview .table-wrap { overflow-x: auto; }
+.preview table { border-collapse: collapse; font-size: 14px; margin: 10px 0; }
+.preview th, .preview td { border: 1px solid var(--line); padding: 6px 10px; text-align: left; vertical-align: top; }
+.preview th { background: var(--code-bg); }
+.preview details { border: 1px solid var(--line); border-radius: 6px; margin: 10px 0; padding: 0 12px; }
+.preview details[open] { padding-bottom: 8px; }
+.preview summary { cursor: pointer; padding: 8px 0; font-weight: 500; display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; justify-content: space-between; }
+.preview summary::marker, .preview summary::-webkit-details-marker { color: var(--muted); }
+.preview summary .tt::before { content: "▸ "; color: var(--muted); }
+.preview details[open] summary .tt::before { content: "▾ "; }
+.preview summary button { padding: 5px 10px; font-size: 13px; }
+.mode { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 8px 18px; align-items: center; font-size: 14px; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 10px 14px; }
+.mode span { color: var(--muted); }
+.mode label { display: inline-flex; gap: 6px; align-items: center; cursor: pointer; }
+.mode input { accent-color: var(--accent); }
+.preview .table-btn { padding: 5px 10px; font-size: 13px; margin: -2px 0 8px; }
+.fallback { width: 100%; min-height: 160px; font-family: var(--font-mono); font-size: 12px; margin-top: 8px; background: var(--code-bg); color: var(--ink); border: 1px solid var(--line); border-radius: 6px; padding: 8px; }
+
+@media (max-width: 760px) {
+  .wrap { grid-template-columns: minmax(0, 1fr); }
+  nav.rail { position: static; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+  .rail .label, .rail .count { grid-column: 1 / -1; }
+}
+@media (prefers-reduced-motion: no-preference) { html { scroll-behavior: smooth; } }
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <h1>ROS 2 Tutorial Additions</h1>
+    <p class="lede">Nine sections to paste into the Notion ROS 2 tutorial, one per gap between the tutorial and the exam. Code sits in toggles (▸ Python / ▸ C++), like the existing pages. Every Python and C++ file was built and run on ROS 2 Humble, and the outputs shown are real.</p>
+    <ol class="how">
+      <li><b>1</b> Open the Notion page named on the card and find the section it goes after.</li>
+      <li><b>2</b> Click <em>Copy for Notion</em>, then paste on an empty line there.</li>
+      <li><b>3</b> If a toggle pastes as plain text, make an empty toggle in Notion (type <code>/toggle</code>) and paste that toggle's <em>Copy code</em> into it.</li>
+      <li><b>4</b> If a table does not paste as a table, try its <em>Copy table</em> button (Markdown), or switch tables to bulleted lists below.</li>
+      <li><b>5</b> Tick <em>Pasted</em> to track progress (saved in this browser only).</li>
+    </ol>
+  </header>
+
+  <div class="mode" role="group" aria-label="How tables are copied">
+    <span>Tables are copied as</span>
+    <label><input type="radio" name="tablemode" id="mode-table" value="table"> Notion tables</label>
+    <label><input type="radio" name="tablemode" id="mode-list" value="list"> bulleted lists</label>
+  </div>
+
+  <nav class="rail" id="rail" aria-label="Sections">
+    <div class="label">Sections</div>
+  </nav>
+
+  <main id="cards"></main>
+</div>
+
+<script>
+const SECTIONS = /*SECTIONS*/[];
+const KEY = 'ros2-tutorial-additions-done';
+let done = {};
+try { done = JSON.parse(localStorage.getItem(KEY) || '{}') || {}; } catch (e) { done = {}; }
+function save() { try { localStorage.setItem(KEY, JSON.stringify(done)); } catch (e) {} }
+
+// Notion does not keep pasted HTML tables, so tables become bulleted lists:
+// 2 columns -> "a：b"; 3+ columns -> "a — header2：b；header3：c". An empty first cell repeats the one above.
+function tablesToLists(root) {
+  root.querySelectorAll('table').forEach(table => {
+    const heads = Array.from(table.querySelectorAll('thead th')).map(th => th.innerHTML.trim());
+    const ul = document.createElement('ul');
+    let label = '';
+    table.querySelectorAll('tbody tr').forEach(tr => {
+      const cells = Array.from(tr.children).map(td => td.innerHTML.trim());
+      if (cells[0]) label = cells[0];
+      const li = document.createElement('li');
+      if (cells.length === 2) {
+        li.innerHTML = '<strong>' + label + '</strong>：' + cells[1];
+      } else {
+        li.innerHTML = '<strong>' + label + '</strong> — ' +
+          cells.slice(1).map((c, i) => heads[i + 1] + '：' + c).join('；');
+      }
+      ul.appendChild(li);
+    });
+    ul.className = 'from-table';
+    table.replaceWith(ul);
+  });
+  return root;
+}
+
+let tableMode = 'table';   // 'table' or 'list'
+try { tableMode = localStorage.getItem(KEY + '-tables') || 'table'; } catch (e) {}
+
+function toFragment(md) {
+  const t = document.createElement('template');
+  t.innerHTML = window.marked ? marked.parse(md) : '<pre>' + md.replace(/[&<]/g, c => c === '&' ? '&amp;' : '&lt;') + '</pre>';
+  return tableMode === 'list' ? tablesToLists(t.content) : t.content;
+}
+
+function render(md) {
+  const div = document.createElement('div');
+  div.appendChild(toFragment(md));
+  return div.innerHTML;
+}
+
+// The Markdown source of each table, in order, for the "Copy table" buttons.
+function markdownTables(md) {
+  const out = []; let cur = [];
+  md.split('\n').forEach(line => {
+    if (/^\|.*\|\s*$/.test(line)) cur.push(line);
+    else if (cur.length) { out.push(cur.join('\n')); cur = []; }
+  });
+  if (cur.length) out.push(cur.join('\n'));
+  return out;
+}
+
+function addTableButtons(card, s) {
+  const tables = markdownTables(s.rich);
+  card.querySelectorAll('.preview ul.from-table, .preview table').forEach((ul, i) => {
+    const btn = document.createElement('button');
+    btn.type = 'button'; btn.className = 'secondary table-btn'; btn.textContent = 'Copy table';
+    btn.id = card.id + '-table-' + i;
+    btn.addEventListener('click', async () => {
+      try { await navigator.clipboard.writeText(tables[i]); flash(card, 'Table copied as Markdown. Paste it on an empty line in Notion.'); }
+      catch (e) { showFallback(card, tables[i]); flash(card, 'Copy was blocked here. The table is selected below: press Ctrl+C (⌘C).'); }
+    });
+    (ul.closest('.table-wrap') || ul).after(btn);
+  });
+}
+
+function wrapTables(card) {
+  card.querySelectorAll('.preview table').forEach(t => {
+    const w = document.createElement('div'); w.className = 'table-wrap';
+    t.replaceWith(w); w.appendChild(t);
+  });
+}
+
+function fillPreview(card, s) {
+  card.querySelector('.preview').innerHTML = render(s.rich);
+  wrapTables(card);
+  addToggleButtons(card);
+  addTableButtons(card, s);
+}
+
+// Each toggle in the preview gets a button that copies just its code.
+function addToggleButtons(card) {
+  card.querySelectorAll('.preview details').forEach((d, i) => {
+    const summary = d.querySelector('summary');
+    const title = summary.textContent;
+    summary.textContent = '';
+    const tt = document.createElement('span'); tt.className = 'tt'; tt.textContent = title;
+    const btn = document.createElement('button');
+    btn.type = 'button'; btn.className = 'secondary'; btn.textContent = 'Copy code';
+    btn.id = card.id + '-toggle-' + i;
+    btn.addEventListener('click', async (ev) => {
+      ev.preventDefault(); ev.stopPropagation();
+      const text = Array.from(d.querySelectorAll('pre code')).map(c => c.textContent.replace(/\n$/, '')).join('\n\n');
+      try { await navigator.clipboard.writeText(text); flash(card, 'Code of "' + title + '" copied.'); }
+      catch (e) { showFallback(card, text); flash(card, 'Copy was blocked here. The code is selected below: press Ctrl+C (⌘C).'); }
+    });
+    summary.append(tt, btn);
+  });
+}
+
+// HTML for the clipboard: the rendered section without the page's wrappers.
+function clipboardHtml(md) {
+  return render(md);
+}
+
+function showFallback(card, text) {
+  let ta = card.querySelector('textarea.fallback');
+  if (!ta) {
+    ta = document.createElement('textarea');
+    ta.className = 'fallback';
+    ta.id = 'fallback-' + card.id;
+    ta.setAttribute('aria-label', 'Text to copy');
+    card.querySelector('.card-head').appendChild(ta);
+  }
+  ta.value = text; ta.hidden = false; ta.focus(); ta.select();
+}
+
+function flash(card, msg) {
+  const el = card.querySelector('.status');
+  el.textContent = msg;
+  clearTimeout(el._t); el._t = setTimeout(() => { el.textContent = ''; }, 4000);
+}
+
+async function copyRich(card, s) {
+  const html = clipboardHtml(s.rich);
+  try {
+    if (!window.ClipboardItem) throw new Error('no ClipboardItem');
+    await navigator.clipboard.write([new ClipboardItem({
+      'text/html': new Blob([html], { type: 'text/html' }),
+      'text/plain': new Blob([s.plain], { type: 'text/plain' }),
+    })]);
+    flash(card, 'Copied. Paste it into Notion.');
+  } catch (e) {
+    // Fall back to selecting the rendered preview, which the browser copies as rich text.
+    card.querySelectorAll('.preview details').forEach(d => { d.open = true; });
+    const range = document.createRange();
+    range.selectNodeContents(card.querySelector('.preview'));
+    const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(range);
+    flash(card, 'Copy was blocked here. The section is selected: press Ctrl+C (⌘C).');
+  }
+}
+
+async function copyMd(card, s) {
+  try {
+    await navigator.clipboard.writeText(s.plain);
+    flash(card, 'Markdown copied. Paste it into Notion.');
+  } catch (e) {
+    showFallback(card, s.plain);
+    flash(card, 'Copy was blocked here. The Markdown is selected below: press Ctrl+C (⌘C).');
+  }
+}
+
+function updateRail() {
+  let n = 0;
+  SECTIONS.forEach(s => {
+    const a = document.getElementById('rail-' + s.id);
+    const isDone = !!done[s.id];
+    a.classList.toggle('is-done', isDone);
+    a.querySelector('.mark').textContent = isDone ? '✓' : s.id;
+    if (isDone) n++;
+  });
+  document.getElementById('count').textContent = n + ' of ' + SECTIONS.length + ' pasted';
+}
+
+const rail = document.getElementById('rail');
+const cards = document.getElementById('cards');
+SECTIONS.forEach(s => {
+  const a = document.createElement('a');
+  a.href = '#sec-' + s.id; a.id = 'rail-' + s.id;
+  a.innerHTML = '<span class="mark"></span><span class="t"></span>';
+  a.querySelector('.t').textContent = s.title;
+  rail.appendChild(a);
+
+  const card = document.createElement('section');
+  card.className = 'card'; card.id = 'sec-' + s.id;
+  card.innerHTML = `
+    <div class="card-head">
+      <div class="row">
+        <div>
+          <div class="id">Section ${s.id} · gap ${s.gap}</div>
+          <h2></h2>
+        </div>
+        <label class="done-toggle"><input type="checkbox" id="done-${s.id}"> Pasted</label>
+      </div>
+      <div class="where">Paste into <b class="page"></b>: <span class="pos"></span></div>
+      <div class="row">
+        <div class="actions">
+          <button type="button" class="primary" id="rich-${s.id}">Copy for Notion</button>
+          <button type="button" class="secondary" id="md-${s.id}">Copy as Markdown</button>
+        </div>
+        <div class="status" role="status"></div>
+      </div>
+    </div>
+    <div class="preview"></div>`;
+  card.querySelector('h2').textContent = s.title;
+  card.querySelector('.page').textContent = s.page;
+  card.querySelector('.pos').textContent = s.where;
+  fillPreview(card, s);
+  const box = card.querySelector('input[type=checkbox]');
+  box.checked = !!done[s.id];
+  box.addEventListener('change', () => { done[s.id] = box.checked; save(); updateRail(); });
+  card.querySelector('#rich-' + s.id).addEventListener('click', () => copyRich(card, s));
+  card.querySelector('#md-' + s.id).addEventListener('click', () => copyMd(card, s));
+  cards.appendChild(card);
+});
+const count = document.createElement('div');
+count.className = 'count'; count.id = 'count';
+rail.appendChild(count);
+updateRail();
+
+document.getElementById('mode-' + tableMode).checked = true;
+document.querySelectorAll('input[name=tablemode]').forEach(r => r.addEventListener('change', () => {
+  tableMode = r.value;
+  try { localStorage.setItem(KEY + '-tables', tableMode); } catch (e) {}
+  SECTIONS.forEach(s => fillPreview(document.getElementById('sec-' + s.id), s));
+}));
+</script>

@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DIT Software Courses</title>
+<link rel="stylesheet" href="assets/worksheet.css">
+</head>
+<body>
+<div class="ws">
+
+<div class="masthead">
+  <div>
+    <div class="kicker">DIT Robotics · Software team</div>
+    <h1>Software courses</h1>
+    <p class="lead">Eight introductory courses and one debug clinic. Each course is one live session of about 4 hours with one worksheet. Together they give you a map of the whole robot software stack: where each piece sits, what it assumes, and how it breaks.</p>
+    <p class="howto"><b>How the worksheets work.</b> The numbered Parts are what we do together in the session. Boxes and Parts marked <b>Go deeper</b> hold ideas that take longer to sink in, for after the session. Step-by-step walkthroughs open from the worksheet; use ← → and press E for the explanation.</p>
+  </div>
+</div>
+
+<nav class="map" aria-label="On this page" data-label="On this page" data-home="index.html"></nav>
+
+<h2 id="courses"><small>Courses</small>In the suggested order</h2>
+<table class="t courses">
+  <tr><th>Course</th><th>You leave knowing</th><th></th></tr>
+  <tr><td>OS‑1: Files and Processes</td><td>why a node is a Linux process, and what permissions, signals and libraries mean for it</td><td class="soon">in preparation</td></tr>
+  <tr><td>OS‑2: Memory, Concurrency and Devices</td><td>how threads, executors and interrupts work, and why nodes deadlock</td><td class="soon">in preparation</td></tr>
+  <tr><td>Networking &amp; Virtualization</td><td>how ROS 2 finds other nodes over the network, and why Docker and campus Wi‑Fi get in the way</td><td class="soon">in preparation</td></tr>
+  <tr><td>State Estimation</td><td>what TF, odometry and a Kalman filter compute, and why the pose drifts</td><td class="soon">in preparation</td></tr>
+  <tr><td>Control Systems</td><td>how feedback and PID turn a path into wheel commands, and why timing matters</td><td class="soon">in preparation</td></tr>
+  <tr><td>Decision-Making</td><td>state machines, behavior trees and planning, and how to handle failure in a match</td><td class="soon">in preparation</td></tr>
+  <tr><td>Machine Learning with Robotics</td><td>what a detection model does, and what it takes to run one on the robot</td><td class="soon">in preparation</td></tr>
+  <tr><td>Robot Software Landscape</td><td>how every part of the stack fits together, on our robot and in industry</td><td class="soon">in preparation</td></tr>
+  <tr><td>Debug Clinic</td><td>how to fix a broken ROS 2 workspace yourself (a hands-on workshop)</td><td class="soon">in preparation</td></tr>
+</table>
+
+<h2 id="example"><small>Example</small>See what a worksheet looks like</h2>
+<p><a href="_template/index.html"><b>Waiting inside a callback</b></a>: a short example worksheet, and the template for every course. A node freezes when it waits for a service reply inside a callback; you find out why, and fix it two ways.</p>
+
+<h2 id="before"><small>Before you start</small>The basics</h2>
+<p>The courses assume you have worked through the club's tutorials:</p>
+<ul>
+  <li><a href="https://ditrobotics.notion.site/ROS2-228c8b048fcf80178d03c0f41c5a1a59">ROS 2 tutorial (Notion)</a></li>
+  <li><a href="https://ditrobotics.notion.site/Docker-2d6c8b048fcf8093b092f24de4ef1a95">Docker tutorial (Notion)</a></li>
+</ul>
+
+<footer class="ws-foot">DIT Robotics · Software courses</footer>
+</div>
+<script src="assets/worksheet.js"></script>
+</body>
+</html>

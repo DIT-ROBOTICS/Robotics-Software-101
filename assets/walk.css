@@ -1,0 +1,174 @@
+/* walk.css: the look of every DIT walkthrough page. walk.js builds the header and footer;
+   the page gives <main> its own columns and panels.
+   Same identity as worksheet.css: navy ink, one teal signal colour for "look here".
+   On a wide screen a walkthrough fills the window like an app (good on a projector).
+   Below 900px the panels stack and the page scrolls; the header stays on top. */
+:root {
+  --bg: #f3f5f8; --panel: #fff; --ink: #0d1b2a; --ink-2: #1c2e44; --muted: #5a6779; --line: #d9dfe7; --soft: #e8ecf1;
+  --sig: #00a896; --sig-ink: #00695e; --sig-t: #dcf5f1; --sig-hl: #9eeadf; --sig-bright: #3ee0cc;
+  --ok: #1e8e4f; --ok-t: #e4f4ea; --bad: #c2352b; --bad-t: #fdebe8;
+  --a: #2266d3;    --a-t: #e3edfb;
+  --b: #c4561c;    --b-t: #fde8da;
+  --exec: #3d4a5c; --exec-t: #e6e9ee;
+  --mw: #7b3fe4;   --mw-t: #efe7fd;
+  --os: #6b6f76;   --os-t: #ecedef;
+  --hw: #8a6500;   --hw-t: #f6edd0;
+  --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", Helvetica, Arial, sans-serif;
+  --mono: ui-monospace, "JetBrains Mono", "SF Mono", "Cascadia Code", Menlo, Consolas, "DejaVu Sans Mono", monospace;
+  --r: 6px;
+  font-size: 17px;
+}
+@media (min-width: 1500px) { :root { font-size: 19px; } }
+@media (max-width: 1200px) { :root { font-size: 15px; } }
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body.walk { background: var(--bg); color: var(--ink); font-family: var(--sans); display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+code, .mono { font-family: var(--mono); }
+b { font-weight: 700; }
+
+/* ---------- header: navy, like the rail of a worksheet ---------- */
+body.walk > header { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; padding: .55rem 1.1rem .5rem; background: var(--ink); color: #fff; }
+header .back { font: .72rem var(--mono); text-transform: uppercase; letter-spacing: .1em; color: #b9c5d3; text-decoration: none; white-space: nowrap;
+               border: 1px solid rgba(255,255,255,.25); border-radius: 4px; padding: .3rem .55rem; }
+header .back:hover { color: #fff; border-color: #fff; }
+header .title { font-weight: 800; font-size: 1.1rem; letter-spacing: -.01em; }
+header .title span { color: #9fb0c2; font-weight: 400; margin-left: .6rem; font-size: .88rem; letter-spacing: 0; }
+header .stepno { margin-left: auto; color: #9fb0c2; font: .78rem var(--mono); white-space: nowrap; }
+header .stepno b { color: #fff; }
+header .part { color: var(--sig-bright); font-weight: 700; }
+header nav { display: flex; gap: .4rem; }
+header nav button { font: inherit; font-weight: 700; font-size: .92rem; padding: .35rem .85rem; border-radius: 4px; border: 1px solid rgba(255,255,255,.35); background: transparent; color: #fff; cursor: pointer; }
+header nav button:hover { background: rgba(255,255,255,.12); }
+header nav button:focus-visible { outline: 3px solid var(--sig-bright); outline-offset: 2px; }
+header nav button:disabled { opacity: .3; cursor: default; }
+header nav button#next { background: var(--sig-bright); border-color: var(--sig-bright); color: var(--ink); }
+header nav button#next:hover { background: #7cf0e0; }
+header nav button#explain { font-weight: 500; color: #cfd8e3; }
+header nav button#explain[aria-pressed="true"] { background: #fff; border-color: #fff; color: var(--ink); font-weight: 700; }
+/* one segment per step; a wider gap where a new section starts; click a segment to jump */
+.progress { display: flex; gap: 3px; background: var(--ink); padding: 0 1.1rem .55rem; flex: none; }
+.progress i { flex: 1; height: 5px; border-radius: 2px; background: rgba(255,255,255,.2); cursor: pointer; transition: background .2s; }
+.progress i:hover { background: rgba(255,255,255,.45); }
+.progress i.done { background: var(--sig); }
+.progress i.cur { background: #fff; }
+.progress i.sec { margin-left: 9px; }
+
+/* ---------- main: the page sets grid-template-columns ---------- */
+body.walk > main { flex: 1; display: grid; gap: 1.1rem; padding: .8rem 1.1rem; min-height: 0; }
+.col { min-width: 0; display: flex; flex-direction: column; gap: .7rem; overflow-y: auto; overflow-x: hidden; padding: .3rem .35rem; }
+.col > div { display: flex; flex-direction: column; gap: .7rem; }
+.col > h2 { margin: 0; font: 700 .7rem var(--mono); text-transform: uppercase; letter-spacing: .12em; color: var(--sig-ink); display: flex; align-items: baseline; gap: .7rem; flex-wrap: wrap; }
+.col > h2::before { content: ""; width: .55rem; height: .55rem; background: var(--sig); border-radius: 2px; align-self: center; }
+.col > h2 small { text-transform: none; letter-spacing: 0; font: 400 .8rem var(--sans); color: var(--muted); }
+
+/* a panel: a flat white card with a small header */
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); overflow: hidden; position: relative; }
+.panel > .ph { display: flex; justify-content: space-between; align-items: baseline; gap: .6rem; padding: .35rem .75rem; font-weight: 700; font-size: .88rem; border-bottom: 1px solid var(--line); background: #f8fafb; }
+.panel > .ph small { font: 400 .7rem var(--mono); color: var(--muted); }
+.panel > .pb { padding: .55rem .75rem; }
+.empty { color: var(--muted); font-style: italic; font-size: .9rem; }
+
+/* ---------- a code listing (walk.js listing()) ---------- */
+.prog ol { list-style: none; margin: 0; padding: .35rem 0; font-family: var(--mono); font-size: .8rem; line-height: 1.55; }
+.prog li { display: grid; grid-template-columns: 2.6rem 1fr; border-left: 4px solid transparent; }
+.prog li .ln { color: #9aa5b3; text-align: right; padding-right: .7rem; user-select: none; }
+.prog li .tx { white-space: pre; overflow: hidden; text-overflow: ellipsis; padding-right: .5rem; }
+.prog li .c { color: #7b8797; font-style: italic; }
+/* syntax colours: the same as in worksheet.css */
+.prog .kw { color: #5746c9; } .prog .fn { color: #0b5fc0; } .prog .str { color: #1e7a4a; } .prog .num { color: #b0530f; }
+.prog li.cur { background: var(--sig-t); border-left-color: var(--sig); }
+.prog li.cur .ln { color: var(--sig-ink); font-weight: 700; }
+.prog li.gap .ln { color: #c3ccd8; }
+
+/* ---------- key/value rows (walk.js kv()) ---------- */
+.kv { display: grid; grid-template-columns: auto 1fr; gap: .15rem .8rem; font-size: .9rem; }
+.kv .k { color: var(--muted); } .kv .v { font-weight: 700; }
+
+/* ---------- actor chips: <span class="actor exec">the executor</span> ---------- */
+.actor { font-weight: 700; color: var(--c); background: var(--t); border-radius: 4px; padding: .05em .4em; white-space: nowrap; }
+.actor.a { --c: var(--a); --t: var(--a-t); } .actor.b { --c: var(--b); --t: var(--b-t); }
+.actor.exec { --c: var(--exec); --t: var(--exec-t); } .actor.mw { --c: var(--mw); --t: var(--mw-t); }
+.actor.os { --c: var(--os); --t: var(--os-t); } .actor.hw { --c: var(--hw); --t: var(--hw-t); }
+
+/* ---------- step highlights ---------- */
+.hot { box-shadow: 0 0 0 2px var(--sig); animation: pulse 1.1s ease-out 1; position: relative; z-index: 1; }
+@keyframes pulse { 0% { box-shadow: 0 0 0 2px var(--sig), 0 0 0 2px rgba(0,168,150,.5); } 100% { box-shadow: 0 0 0 2px var(--sig), 0 0 0 10px rgba(0,168,150,0); } }
+@media (prefers-reduced-motion: reduce) { .hot { animation: none; } }
+.new, .gone, [data-tag] { position: relative; }
+.new::after, .gone::after, [data-tag]::after { position: absolute; top: -.55rem; right: .6rem; color: #fff; font: 700 .58rem var(--mono); padding: .08rem .4rem; border-radius: 3px; letter-spacing: .1em; z-index: 2; }
+.new::after { content: "NEW"; background: var(--sig-ink); }
+.gone { opacity: .5; border-style: dashed !important; border-color: var(--bad) !important; }
+.gone::after { content: "GONE"; background: var(--bad); }
+[data-tag]::after { content: attr(data-tag); background: var(--ink); }
+
+/* result cards */
+.okcard, .fault { border: 1px solid; border-left-width: 4px; border-radius: 0 var(--r) var(--r) 0; padding: .45rem .75rem; font-size: .92rem; }
+.okcard { border-color: var(--ok); background: var(--ok-t); } .okcard .fh { color: #17603a; font-weight: 800; }
+.fault { border-color: var(--bad); background: var(--bad-t); } .fault .fh { color: var(--bad); font-weight: 800; }
+
+/* a terminal panel */
+.term { background: var(--ink); color: #e3e9f0; font-family: var(--mono); font-size: .78rem; line-height: 1.5; padding: .5rem .75rem; border-radius: var(--r); min-height: 6rem; }
+.term .ln { display: grid; grid-template-columns: 3.2rem 1fr; }
+.term .t { color: #7f90a4; }
+.term .a { color: #8ab8ff; } .term .b { color: #ffab78; } .term .ok { color: var(--sig-bright); font-weight: 700; } .term .m { color: #9fb0c2; font-style: italic; }
+.term .ln.fresh { background: rgba(62,224,204,.13); box-shadow: -.75rem 0 0 rgba(62,224,204,.13), inset 0 0 0 0 transparent; }
+
+/* ---------- the guess card (walk.js guessCard()): outlined in navy, like every question ---------- */
+.guess { background: #fff; border: 1px solid var(--ink); border-radius: var(--r); padding: .55rem .8rem .65rem; }
+.guess .gh { font: 700 .62rem var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--sig-ink); }
+.guess p { margin: .3rem 0 .5rem; font-size: .95rem; line-height: 1.4; }
+.guess code { background: var(--soft); padding: 0 .3rem; border-radius: 3px; }
+.guess .opts { display: grid; grid-template-columns: repeat(auto-fit, minmax(7rem, 1fr)); gap: .35rem; }
+.guess button { font: inherit; font-size: .86rem; font-weight: 600; color: var(--ink); padding: .3rem .4rem; border: 1px solid var(--line); border-radius: 4px; background: #fff; cursor: pointer; }
+.guess button:hover { border-color: var(--ink); }
+.guess button.pick { border-color: var(--sig); background: var(--sig-t); }
+.guess .gn { font-size: .78rem; color: var(--muted); margin-top: .4rem; }
+.guess.done .gn { color: var(--ink); font-weight: 700; font-size: .9rem; margin-left: .5rem; }
+.guess .ans { display: inline-block; font-size: .86rem; border-radius: 4px; padding: .2rem .55rem; margin: .45rem .35rem 0 0; }
+.guess .ans small { font: 700 .58rem var(--mono); letter-spacing: .1em; text-transform: uppercase; margin-right: .4rem; }
+.guess .ans.right { background: var(--sig-t); font-weight: 700; } .guess .ans.right small { color: var(--sig-ink); }
+.guess .ans.wrong { background: var(--bad-t); } .guess .ans.wrong small { color: var(--bad); }
+
+/* ---------- footer: the call line and the explanation ---------- */
+body.walk > footer { background: #fff; border-top: 1px solid var(--line); box-shadow: 0 -6px 18px rgba(13,27,42,.06); padding: .7rem 1.1rem .9rem; display: grid; gap: .5rem; min-height: 9rem; flex: none; max-height: 40vh; overflow-y: auto; }
+.call { display: flex; align-items: center; gap: .8rem; flex-wrap: wrap; font-family: var(--mono); font-size: .95rem; }
+.call:empty { display: none; }
+.call .who { background: var(--c, var(--exec)); color: #fff; padding: .15rem .6rem; border-radius: 4px; font: 700 .68rem var(--mono); text-transform: uppercase; letter-spacing: .1em; }
+.call .act { font-weight: 700; }
+.call .ret { color: var(--ok); font-weight: 800; }
+.call .ret.bad { color: var(--bad); }
+.call .note { color: var(--muted); font-family: var(--sans); font-size: .9rem; }
+.narr h3 { margin: 0 0 .3rem; font-size: 1.15rem; letter-spacing: -.01em; }
+.narr p { margin: 0 0 .3rem; font-size: 1.03rem; line-height: 1.5; max-width: 110ch; }
+.narr ul { margin: .2rem 0 0; padding-left: 1.3rem; font-size: 1rem; line-height: 1.4; columns: 2; column-gap: 2.5rem; }
+.narr li { break-inside: avoid; margin-bottom: .25rem; }
+.narr li::marker { color: var(--sig); }
+.narr code { background: var(--soft); padding: .05em .3rem; border-radius: 4px; font-size: .9em; }
+.narr mark { color: inherit; font-weight: 600; background: linear-gradient(transparent 58%, var(--sig-hl) 58%, var(--sig-hl) 94%, transparent 94%); padding: 0 .1em; -webkit-box-decoration-break: clone; box-decoration-break: clone; }
+.narr mark code { background: transparent; padding: 0; }
+.narr a { color: #0b5fc0; }
+footer.collapsed { min-height: 0; }
+footer.collapsed .narr > :not(h3) { display: none; }
+footer.collapsed .narr h3 { cursor: pointer; }
+footer.collapsed .narr h3::after { content: "press E for the explanation"; margin-left: .8rem; color: var(--muted); font: 400 .66rem var(--mono); text-transform: uppercase; letter-spacing: .1em; border: 1px solid var(--line); border-radius: 4px; padding: .15rem .45rem; vertical-align: middle; white-space: nowrap; }
+
+/* ---------- arrows drawn over the page ---------- */
+#arrows { position: fixed; inset: 0; width: 100vw; height: 100vh; pointer-events: none; z-index: 3; }
+#arrows path { fill: none; stroke-width: 2.5; stroke: var(--exec); }
+#arrows polygon { fill: var(--exec); }
+#arrows .flow { stroke: var(--exec); stroke-width: 3; } #arrows polygon.flow { fill: var(--exec); }
+#arrows path.wait { stroke: var(--bad); stroke-dasharray: 6 4; stroke-width: 3; } #arrows polygon.wait { fill: var(--bad); }
+#arrows path.ok { stroke: var(--ok); stroke-width: 3; } #arrows polygon.ok { fill: var(--ok); }
+#arrows path.mw { stroke: var(--mw); stroke-dasharray: 7 5; stroke-width: 3; } #arrows polygon.mw { fill: var(--mw); }
+#arrows text { font: 700 11px var(--mono); paint-order: stroke; stroke: #fff; stroke-width: 4px; }
+#arrows text.wait { fill: var(--bad); } #arrows text.mw { fill: var(--mw); } #arrows text.ok { fill: var(--ok); }
+
+/* ---------- narrow screens: stack, and let the page scroll ---------- */
+@media (max-width: 900px) {
+  body.walk { height: auto; min-height: 100vh; overflow: visible; }
+  body.walk > header { position: sticky; top: 0; z-index: 4; }
+  body.walk > main { grid-template-columns: 1fr !important; }
+  .col { overflow: visible; }
+  body.walk > footer { max-height: none; }
+  .narr ul { columns: 1; }
+}

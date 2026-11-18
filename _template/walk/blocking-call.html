@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Walkthrough 1: A wait that never ends</title>
+<link rel="stylesheet" href="../../assets/walk.css">
+<style>
+  main { grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); }
+  .clock { font-family: var(--mono); font-weight: 700; font-size: 1.3rem; font-variant-numeric: tabular-nums; }
+  .clock small { font: 500 .8rem var(--sans); color: var(--muted); margin-left: .4rem; }
+  .thread { border: 1px solid var(--line); border-left: 4px solid var(--line); border-radius: 0 var(--r) var(--r) 0; padding: .35rem .6rem; margin-top: .35rem; font-size: .92rem; background: #fff; }
+  .thread b { display: block; font: 700 .62rem var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+  .thread.run { border-color: var(--exec); background: var(--exec-t); }
+  .thread.stuck { border-color: var(--bad); background: var(--bad-t); color: #7a1f14; }
+  .thread.stuck b { color: var(--bad); }
+  .rd { display: flex; justify-content: space-between; gap: .6rem; border: 1px solid var(--exec); border-left-width: 4px; border-radius: 0 var(--r) var(--r) 0; padding: .25rem .55rem; margin: .45rem 0 .2rem; font-size: .9rem; background: #fff; }
+  .rd.reply { border-color: var(--mw); color: var(--mw); font-weight: 700; }
+  .rd small { color: var(--muted); font-weight: 500; }
+  .srv { font-size: .92rem; }
+  .srv.working { color: var(--b); font-weight: 700; }
+  .srv.replied { color: var(--ok); font-weight: 700; }
+</style>
+</head>
+<body class="walk" data-title="Walkthrough 1: A wait that never ends" data-sub="one thread, one service call" data-back="../index.html#reply">
+<script src="../../assets/walk.js"></script>
+
+<main>
+  <section class="col">
+    <h2>The code <small>the line the thread is running is highlighted</small></h2>
+    <div id="left"></div>
+  </section>
+  <section class="col">
+    <h2>Inside the node <small>what the executor is doing, and what is waiting</small></h2>
+    <div id="right"></div>
+  </section>
+</main>
+
+<script>
+/* MODEL. The numbers are the real run of code/ in the Humble container (rounded to 0.1 s):
+   heartbeat every 0.5 s from t = 0.5; ask() at 3.0; slow_server works 3.0 to 5.0 and replies 3.
+   The listings are copied from code/blocking_client.py and code/async_client.py, with their
+   real line numbers. Change them together. */
+const BLOCK = [
+  [7, "class BlockingClient(Node):"],
+  [8, "    def __init__(self):"],
+  [9, "        super().__init__('blocking_client')"],
+  [10, "        self.client = self.create_client(AddTwoInts, 'add_two_ints')"],
+  [11, "        self.create_timer(3.0, self.ask)"],
+  [12, "        self.create_timer(0.5, self.heartbeat)"],
+  [13, ""],
+  [14, "    def ask(self):"],
+  [15, "        if not self.client.service_is_ready():"],
+  [16, "            return"],
+  [17, "        self.get_logger().info('calling...')"],
+  [18, "        result = self.client.call(AddTwoInts.Request(a=1, b=2))   # blocks this thread"],
+  [19, "        self.get_logger().info(f'result: {result.sum}')"],
+  [20, ""],
+  [21, "    def heartbeat(self):"],
+  [22, "        self.get_logger().info('heartbeat')"],
+  [23, ""],
+  [24, ""],
+  [25, "def main():"],
+  [26, "    rclpy.init()"],
+  [27, "    rclpy.spin(BlockingClient())"],
+];
+const ASYNC = [
+  [7, "class AsyncClient(Node):"],
+  [8, "    def __init__(self):"],
+  [9, "        super().__init__('async_client')"],
+  [10, "        self.client = self.create_client(AddTwoInts, 'add_two_ints')"],
+  [11, "        self.create_timer(3.0, self.ask)"],
+  [12, "        self.create_timer(0.5, self.heartbeat)"],
+  [13, ""],
+  [14, "    def ask(self):"],
+  [15, "        if not self.client.service_is_ready():"],
+  [16, "            return"],
+  [17, "        self.get_logger().info('calling...')"],
+  [18, "        future = self.client.call_async(AddTwoInts.Request(a=1, b=2))   # returns at once"],
+  [19, "        future.add_done_callback(self.on_reply)                         # runs when the reply is in"],
+  [20, ""],
+  [21, "    def on_reply(self, future):"],
+  [22, "        self.get_logger().info(f'result: {future.result().sum}')"],
+  [23, ""],
+  [24, "    def heartbeat(self):"],
+  [25, "        self.get_logger().info('heartbeat')"],
+  [26, ""],
+  [27, ""],
+  [28, "def main():"],
+  [29, "    rclpy.init()"],
+  [30, "    rclpy.spin(AsyncClient())"],
+];
+
+const GUESSES = {
+  next: { q: 'The server replies at t = 5.0 s. What does <code>blocking_client</code> print next?',
+          choices: ['result: 3', 'heartbeat', 'nothing, ever', 'an error'], right: 2,
+          answer: 'nothing, ever: the node is deadlocked' },
+};
+
+function initialState() {
+  return { mode: 'block', t: 0, thread: 'spin', fn: '', line: 27, ready: [], out: [], fresh: 0,
+           server: 'idle', guess: false, reveal: false };
+}
+/* each step starts with begin(s): output and ready items added after it count as new in this step */
+function begin(s) { s.fresh = s.out.length; }
+function say(s, t, who, text) { s.out.push([t, who, text]); }
+function ready(s, id, label, note) { s.ready.push({ id, label, note }); s.ghosts.push(id); }
+
+/* ---------- drawing ---------- */
+function renderPanels(s, H) {
+  $('left').innerHTML = s.mode === 'block'
+    ? listing('code', 'blocking_client.py', 'code/blocking_client.py', BLOCK, s.line)
+    : listing('code', 'async_client.py', 'code/async_client.py', ASYNC, s.line);
+
+  const TH = {
+    spin:  ['', 'waiting in <code>spin()</code> until something is ready'],
+    run:   ['run', `running <code>${s.fn}</code>`],
+    stuck: ['stuck', 'stuck in <code>call()</code>, waiting until the reply is handled'],
+  }[s.thread];
+  const execBody = `<div class="clock">t = ${s.t.toFixed(1)} s<small>since the node started</small></div>
+    <div class="thread ${TH[0]}" id="thread"><b>the one thread</b>${TH[1]}</div>`;
+
+  const readyBody = s.ready.length
+    ? s.ready.slice().reverse().map(r => `<div class="rd ${r.id === 'r-reply' ? 'reply' : ''} ${s.ghosts.includes(r.id) ? 'new' : ''}" id="${r.id}"><span>${r.label}</span><small>${r.note || ''}</small></div>`).join('')
+    : '<div class="empty">nothing is waiting</div>';
+
+  const SRV = { idle: ['', 'idle'], working: ['working', 'working on 1 + 2 (takes 2 s)'], replied: ['replied', 'replied 3'] }[s.server];
+
+  const lines = s.out.slice(-10).map(([t, who, text], i, arr) => {
+    const isNew = s.out.length - arr.length + i >= s.fresh;
+    const name = who === 'a' || who === 'ok' ?`[${s.mode === 'block' ? 'blocking_client' : 'async_client'}]` : who === 'b' ? '[slow_server]' : '';
+    return `<div class="ln ${isNew ? 'fresh' : ''}"><span class="t">${t == null ? '' : t.toFixed(1)}</span><span class="${who}">${name} ${esc(text)}</span></div>`;
+  }).join('') || '<div class="ln"><span></span><span class="m">(no output yet)</span></div>';
+
+  $('right').innerHTML =
+    (s.guess ? guessCard('next', s.reveal) : '') +
+    panel('exec', `${actor('exec', 'Executor')}`, 'SingleThreadedExecutor', execBody) +
+    panel('readyp', 'Ready, waiting for the thread', 'timers, messages, replies', readyBody) +
+    panel('server', `${actor('b', 'slow_server')}`, 'another process', `<div class="srv ${SRV[0]}" id="srv">${SRV[1]}</div>`) +
+    `<div class="term" id="term">${lines}</div>`;
+}
+
+/* ---------- steps ---------- */
+const A = 'A · The loop works', B = 'B · A wait that never ends', C = "C · Fix 1: don't wait";
+const EXEC = actor('exec', 'The executor'), THREAD = actor('exec', 'The thread');
+
+const STEPS = [
+  { part: A, title: `${EXEC} starts: one thread, waiting for work`,
+    narr: `<code>rclpy.spin()</code> creates a <b>SingleThreadedExecutor</b> and gives it the node. The executor owns <mark>exactly one thread</mark>, and that thread does one job, forever: wait until a timer, a message or a reply is ready, run its callback, then wait again. Nothing is ready yet, so it waits.`,
+    apply: s => { begin(s); s.t = 0; s.thread = 'spin'; s.line = 27;
+      return { hot: ['thread'], call: { who: 'exec', act: 'rclpy.spin(BlockingClient())', note: 'one thread that waits, runs a callback, and waits again' } }; } },
+
+  { part: A, title: `t = 0.5 s: the heartbeat timer is ready, and ${THREAD} runs it`,
+    narr: `The heartbeat timer comes due every 0.5 s. The thread runs <code>heartbeat()</code> from start to finish, which prints one line, and goes straight back to waiting. A <b>callback</b> is just this: a function you gave ROS, for ROS to call later.`,
+    apply: s => { begin(s); s.t = 0.5; s.thread = 'run'; s.fn = 'heartbeat()'; s.line = [21, 22]; say(s, 0.5, 'a', 'heartbeat');
+      return { hot: ['thread'], call: { who: 'exec', act: 'heartbeat()', ret: 'returns', note: 'prints one line, then back to waiting' } }; } },
+
+  { part: A, title: `t = 3.0 s: two timers are ready at once`,
+    narr: `The same thing happened at 1.0, 1.5, 2.0 and 2.5 s. At 3.0 s, both <code>ask</code> and <code>heartbeat</code> are due. <mark>One thread runs one callback at a time</mark>, so <code>ask()</code> runs first and the heartbeat waits its turn. <code>ask()</code> prints <code>calling...</code>.`,
+    apply: s => { begin(s); [1.0, 1.5, 2.0, 2.5].forEach(t => say(s, t, 'a', 'heartbeat'));
+      s.t = 3.0; s.thread = 'run'; s.fn = 'ask()'; s.line = 17; say(s, 3.0, 'a', 'calling...');
+      ready(s, 'r-hb', 'heartbeat timer', 'due at 3.0 s');
+      return { hot: ['thread', 'r-hb'], call: { who: 'exec', act: 'ask()', note: 'the heartbeat is due too, and waits its turn' } }; } },
+
+  { part: B, title: `${THREAD} calls <code>call()</code>, and starts to wait`,
+    narr: `<code>call()</code> does two things. It sends the request to <code>slow_server</code>, which starts working on it. Then it makes <mark>the thread that called it</mark> wait until the reply has been handled. That thread is the executor's only thread. The server will reply at 5.0 s. Make a guess before you go on.`,
+    apply: s => { begin(s); s.thread = 'stuck'; s.line = 18; s.server = 'working'; s.guess = true;
+      say(s, 3.0, 'b', 'got 1 + 2, working...');
+      return { hot: ['thread', 'guess-next'], 
+               call: { who: 'exec', act: 'self.client.call(AddTwoInts.Request(a=1, b=2))', note: 'sends the request, then waits on this thread' } }; } },
+
+  { part: B, title: 't = 3.0 to 5.0 s: the heartbeat is due, and nobody runs it',
+    narr: `The heartbeat timer comes due again at 3.5, 4.0 and 4.5 s. It just stays ready. The only thread that could run it is stuck in <code>call()</code>, so <mark>no heartbeat is printed</mark>, even though the heartbeat has nothing to do with the service.`,
+    apply: s => { begin(s); s.t = 4.5; s.ready[0].note = 'due since 3.0 s, still waiting';
+      return { hot: ['r-hb', 'thread'], call: { who: 'exec', act: 'still inside call()', note: 'the server is still working' } }; } },
+
+  { part: B, title: 't = 5.0 s: the reply arrives, and it is work for the executor',
+    narr: `The server replies, and DDS delivers the reply to the client's process. But nothing in the client has looked at it yet. <mark>Handling a reply is a callback like any other</mark>: the executor's thread must take it from the ready list and run it. Only then is the request marked done, and only that would wake up the waiting <code>call()</code>.`,
+    apply: s => { begin(s); s.t = 5.0; s.server = 'replied'; say(s, 5.0, 'b', 'replied 3');
+      ready(s, 'r-reply', 'reply from add_two_ints', 'arrived at 5.0 s');
+      return { hot: ['r-reply'], arrows: [['srv', 'r-reply', 'mw', 'reply 3']],
+               call: { who: 'mw', act: 'reply 3 reaches blocking_client', note: 'now the executor must handle it' } }; } },
+
+  { part: B, title: 'Deadlock: each one waits for the other',
+    narr: `The thread waits until the reply is handled. The reply waits until the thread is free to handle it. Neither can go first, so both wait forever. This is a <b>deadlock</b>. <mark>Every callback of this node now waits for a thread that will never come back</mark>, and that is why the heartbeat stopped too. A faster server would not help: a reply at 3.1 s would wait in the same list.`,
+    apply: s => { begin(s); s.reveal = true; say(s, null, 'm', '(nothing more, ever)');
+      return { hot: ['thread', 'r-reply', 'guess-next'], arrows: [['thread', 'r-reply', 'wait', 'waits for']],
+               call: { who: 'exec', act: 'event.wait()', ret: 'never returns', bad: true, note: 'inside call(): see Part 5 of the worksheet' } }; } },
+
+  { part: C, title: 'Back to t = 3.0 s: <code>call_async()</code> sends the request and returns at once',
+    narr: `Now the same moment in <code>async_client.py</code>. <code>call_async()</code> sends the same request but does not wait. It returns at once with a <b>future</b>, an object that will hold the reply later. <code>add_done_callback()</code> says which function to run when the reply is in. Then <code>ask()</code> returns, and <mark>the thread is free again</mark>.`,
+    apply: s => { Object.assign(s, initialState()); s.ghosts = []; s.mode = 'async';
+      [0.5, 1.0, 1.5, 2.0, 2.5].forEach(t => say(s, t, 'a', 'heartbeat')); say(s, 3.0, 'a', 'calling...'); begin(s);
+      s.t = 3.0; s.thread = 'run'; s.fn = 'ask()'; s.line = [18, 19]; s.server = 'working'; say(s, 3.0, 'b', 'got 1 + 2, working...');
+      return { hot: ['thread'], 
+               call: { who: 'exec', act: 'self.client.call_async(...)', ret: '→ a future', note: 'returns at once' } }; } },
+
+  { part: C, title: 't = 3.0 to 4.5 s: the heartbeat keeps going',
+    narr: `While the server works, the thread is back in <code>spin()</code>, and it runs the heartbeat every 0.5 s as before. Compare this with step 5, where the same timer was stuck in the ready list.`,
+    apply: s => { begin(s); [3.0, 3.5, 4.0, 4.5].forEach(t => say(s, t, 'a', 'heartbeat'));
+      s.t = 4.5; s.thread = 'run'; s.fn = 'heartbeat()'; s.line = [24, 25];
+      return { hot: ['term'], call: { who: 'exec', act: 'heartbeat()', note: 'every 0.5 s, while the server works' } }; } },
+
+  { part: C, title: 't = 5.0 s: the reply is handled, and <code>on_reply()</code> runs',
+    narr: `The reply arrives and becomes ready. The thread is free, so it handles the reply right away: the future is done, and the thread runs <code>on_reply()</code>, which prints <code>result: 3</code>. <mark>No callback ever waits for another</mark>, so nothing can deadlock.`,
+    apply: s => { begin(s); s.t = 5.0; say(s, 5.0, 'a', 'heartbeat'); s.server = 'replied'; say(s, 5.0, 'b', 'replied 3');
+      s.thread = 'run'; s.fn = 'on_reply()'; s.line = [21, 22]; say(s, 5.0, 'ok', 'result: 3');
+      return { hot: ['thread', 'term'],
+               call: { who: 'exec', act: 'on_reply(future)', ret: 'result: 3' } }; } },
+
+  { part: 'Recap', title: 'What you should have seen',
+    narr: `<ul>
+      <li>A SingleThreadedExecutor has <b>one thread</b>. It runs one callback at a time, from start to finish.</li>
+      <li>While a callback runs, <b>everything else in the node waits</b>: timers, messages, replies.</li>
+      <li><code>call()</code> makes the thread that called it <b>wait</b> until the reply is handled.</li>
+      <li><b>Handling the reply is executor work.</b> Inside a callback, no thread is left to do it: deadlock.</li>
+      <li><code>call_async()</code> with a done callback <b>never waits</b>, so the thread stays free.</li>
+      <li>The worksheet shows a second fix: give the executor more threads (Part 4).</li>
+    </ul><p><a href="../index.html#fixes">Back to the worksheet</a></p>`,
+    apply: s => ({ hot: [] }) },
+];
+</script>
+</body>
+</html>

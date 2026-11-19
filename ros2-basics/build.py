@@ -16,7 +16,7 @@ import re
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-LANG = {'.py': 'python', '.cpp': 'cpp', '.txt': 'cmake'}
+LANG = {'.py': 'python', '.cpp': 'cpp', '.txt': 'cmake', '.xml': 'xml', '.msg': 'text'}
 NOTES = {
     'run': '> Python 範例可以直接用 `python3 檔名.py` 執行（要先 `source /opt/ros/humble/setup.bash`），'
            '或像 Topic 頁的 Python 範例一樣放進 package（`setup.py` 的 `entry_points`）用 `ros2 run` 執行。',

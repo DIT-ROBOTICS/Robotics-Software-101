@@ -5,7 +5,7 @@ This folder holds the sections we added to it and the code behind them.
 
 | Path | What it is |
 |---|---|
-| `sections/A–H.md` | Section text (繁體中文) as pasted into Notion; `unused/I.md` was not pasted |
+| `sections/A–H.md`, `J.md` | Section text (繁體中文) to paste into Notion; `unused/I.md` was not pasted |
 | `code/` | Every example (Python and C++), tested on ROS 2 Humble |
 | `build.py`, `template.html` | Build the paste page: `python3 build.py template.html OUT.html` |
 | `verify/` | A Humble container with the examples set up as the tutorial says; see `verify/README.md` |

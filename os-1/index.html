@@ -1,0 +1,881 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- OS-1. Every example was run in dit-ros2-tutorial:humble on 2026-11-20; outputs are pasted
+     from those runs (ROS timestamps and tracebacks cut where marked). No times on this page:
+     see SESSION.md. -->
+<title>OS‑1: Files and Processes</title>
+<script src="../assets/lang.js"></script>
+<link rel="stylesheet" href="../assets/worksheet.css">
+</head>
+<body>
+<div class="ws">
+
+<div class="masthead">
+  <div>
+    <div class="kicker"><span lang="en">DIT Robotics · Software courses · OS‑1</span><span lang="zh-Hant">DIT Robotics · 軟體課程 · OS‑1</span></div>
+    <h1><span lang="en">Files and Processes</span><span lang="zh-Hant">檔案與 process</span></h1>
+    <p class="lead" lang="en">Every node you start is a Linux <span class="who a">process</span>, and the <span class="who os">Linux kernel</span> decides how it starts, how it stops and what it may touch. In this session we start a small robot stack, try to stop it, and fail. Then we find out why. On the way you learn the operating-system ideas behind most "it won't stop", "it died when SSH dropped", "permission denied" and "works on my machine" problems: processes, signals, daemons, file permissions and shared libraries.</p>
+    <p class="lead" lang="zh-Hant">你啟動的每個 node 都是一個 Linux <span class="who a">process</span>，而 <span class="who os">Linux 核心</span>決定它怎麼啟動、怎麼停止、可以碰什麼。這堂課我們啟動一個小小的機器人系統，試著把它停掉，結果失敗了；然後找出原因。過程中你會學到大部分「停不下來」、「SSH 一斷就死掉」、「permission denied」、「在我電腦上可以跑」問題背後的作業系統觀念：process、signal、daemon、檔案權限和共享函式庫。</p>
+    <p class="howto" lang="en"><b>How to use this page.</b> The numbered Parts are what we do together in the session. Boxes and Parts marked <b>Go deeper</b> hold ideas that take longer to sink in: come back to them after the session. Every command here runs in the club's Humble container. The <b>中文</b> button (or the L key) switches the page to Chinese.</p>
+    <p class="howto" lang="zh-Hant"><b>怎麼用這一頁。</b>有編號的部分是課堂上一起做的。標成<b>延伸</b>的方塊和部分，放的是比較需要時間消化的觀念，課後再回來看。這裡每個指令都在社團的 Humble 容器裡跑。<b>English</b> 按鈕（或 L 鍵）可以切回英文。</p>
+  </div>
+</div>
+
+<nav class="map" aria-label="Session map" data-home="../index.html"></nav>
+
+<!-- ============================================================ -->
+<h2 id="puzzle"><small><span lang="en">Part 1</span><span lang="zh-Hant">第 1 部分</span></small><span lang="en">You stopped it. It's still running.</span><span lang="zh-Hant">你停掉它了，它還在跑</span></h2>
+
+<p lang="en">Our running example is a tiny robot stack: three programs started by one launch file. <span class="who hw">fake_mcu</span> plays a microcontroller: it sends wheel ticks over a fake serial port, <code>/tmp/mcu</code>. <span class="who a">driver</span> reads that port and publishes <code>/wheel_ticks</code>. <span class="who a">monitor</span> prints the latest value once a second.</p>
+<p lang="zh-Hant">我們的範例是一個很小的機器人系統：一個 launch 檔啟動三個程式。<span class="who hw">fake_mcu</span> 扮演微控制器：透過一個假的序列埠 <code>/tmp/mcu</code> 送出輪子的 tick。<span class="who a">driver</span> 讀這個序列埠，發布 <code>/wheel_ticks</code>。<span class="who a">monitor</span> 每秒印一次最新的值。</p>
+
+<pre data-lang="py"><span class="hl" data-note="ExecuteProcess starts one program. Three of them: three programs running at the same time." data-note-zh="ExecuteProcess 啟動一個程式。三個 ExecuteProcess：三個同時在跑的程式。">def py(script):
+    return ExecuteProcess(cmd=['python3', os.path.join(HERE, script)], output='screen')</span>
+
+def generate_launch_description():
+    return LaunchDescription([
+        py('fake_mcu.py'),
+        TimerAction(period=1.0, actions=[py('driver.py'), py('monitor.py')]),
+    ])</pre>
+<p class="notes-hint" lang="en">The whole stack is in <a href="code/"><code>code/</code></a>: <code>robot.launch.py</code>, <code>fake_mcu.py</code>, <code>driver.py</code>, <code>monitor.py</code>.</p>
+<p class="notes-hint" lang="zh-Hant">整個系統在 <a href="code/"><code>code/</code></a>：<code>robot.launch.py</code>、<code>fake_mcu.py</code>、<code>driver.py</code>、<code>monitor.py</code>。</p>
+
+<p lang="en">In terminal T1 we start it:</p>
+<p lang="zh-Hant">在終端機 T1 啟動它：</p>
+<pre class="term"><span class="m"># T1</span>
+<span class="ok">$ ros2 launch robot.launch.py</span>
+[INFO] [python3-1]: process started with pid [472]
+[python3-1] fake_mcu: /tmp/mcu -> /dev/pts/1
+[INFO] [python3-2]: process started with pid [474]
+[INFO] [python3-3]: process started with pid [476]
+<span class="a">[python3-2] [INFO] [driver]: reading /tmp/mcu</span>
+<span class="a">[python3-3] [INFO] [monitor]: ticks = 63</span>
+<span class="a">[python3-3] [INFO] [monitor]: ticks = 133</span></pre>
+
+<p lang="en">Normally you stop a launch by pressing Ctrl+C in its terminal, and that works (Part 4 shows why). But sometimes that terminal is out of reach: a start-up script launched it, it runs in a teammate's tmux window, or your SSH session dropped while it ran inside the container (Part 5 shows it keeps running). Then you stop it from another terminal, T2, the way you stop any program: find it with <code>ps</code>, and <code>kill</code> it.</p>
+<p lang="zh-Hant">平常你會在 launch 的終端機按 Ctrl+C 停掉它，而且有用（第 4 部分會說明為什麼）。但有時候那個終端機你碰不到：它是開機腳本啟動的、它跑在隊友的 tmux 視窗裡，或它在容器裡跑的時候你的 SSH 斷線了（第 5 部分會看到它還在跑）。這時你只能從另一個終端機 T2 停掉它，就像停掉任何程式一樣：用 <code>ps</code> 找到它，再 <code>kill</code> 掉。</p>
+<pre class="term"><span class="m"># T2</span>
+<span class="ok">$ ps -e -o pid,ppid,cmd</span>
+    471     463 /usr/bin/python3 /opt/ros/humble/bin/ros2 launch robot.launch.py
+    472     471 python3 /code/fake_mcu.py
+    474     471 python3 /code/driver.py
+    476     471 python3 /code/monitor.py
+<span class="ok">$ kill 471</span></pre>
+<pre class="term"><span class="m"># T1</span>
+<span class="b">Terminated</span>
+$</pre>
+<p lang="en">T1 says <code>Terminated</code> and gives us the prompt back. Done? Back in T2:</p>
+<p lang="zh-Hant">T1 印出 <code>Terminated</code>，回到提示字元。停掉了嗎？回到 T2：</p>
+<pre class="term"><span class="m"># T2</span>
+<span class="ok">$ ros2 node list</span>
+<span class="b">/driver</span>
+<span class="b">/monitor</span>
+<span class="ok">$ ps -e -o pid,ppid,cmd</span>
+    472       1 python3 /code/fake_mcu.py
+    474       1 python3 /code/driver.py
+    476       1 python3 /code/monitor.py</pre>
+
+<p lang="en"><mark>The launch is gone, but all three programs are still running.</mark> The nodes still publish, still hold the serial port, and will clash with the next launch you start. Something else changed too: the second column, the parent, was 471 and is now 1.</p>
+<p lang="zh-Hant"><mark>launch 不見了，但三個程式都還在跑。</mark>node 還在發布、還佔著序列埠，下一次啟動 launch 時會跟它們撞在一起。還有一件事變了：第二欄（父 process）原本是 471，現在變成 1。</p>
+
+<div class="think">
+  <p lang="en">Why did <code>kill</code> stop the launch but not the nodes it started? And who is "1"? Write your guess down. Part 4 answers it.</p>
+  <p lang="zh-Hant">為什麼 <code>kill</code> 停掉了 launch，卻沒停掉它啟動的 node？「1」又是誰？把你的猜測寫下來，第 4 部分會回答。</p>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="computer"><small><span lang="en">Part 2</span><span lang="zh-Hant">第 2 部分</span></small><span lang="en">Inside the computer</span><span lang="zh-Hant">電腦裡面</span></h2>
+
+<p lang="en">Before we look at processes, here is the hardware they run on. You only need four things that hold data and one thing that does the work. Every later Part (and every later course) leans on this picture.</p>
+<p lang="zh-Hant">在看 process 之前，先看它們跑在什麼硬體上。你只需要知道四個存放資料的地方，和一個做事的東西。後面每個部分（以及後面每堂課）都會用到這張圖。</p>
+
+<h3><span lang="en">The CPU runs instructions</span><span lang="zh-Hant">CPU 執行指令</span></h3>
+<p lang="en">To the <span class="who hw">CPU</span>, a program is a long list of very simple <b>instructions</b>: load a number, add two numbers, compare, jump to another place in the list. A <b>core</b> is one part of the CPU that runs instructions one after another, driven by a clock: 2.9 GHz means 2.9 billion ticks a second, and a simple instruction takes about one tick. A core works on <b>registers</b>: a few dozen slots inside the core, each holding one number. One register, the program counter, holds which instruction is next.</p>
+<p lang="zh-Hant">對 <span class="who hw">CPU</span> 來說，程式是一長串非常簡單的<b>指令</b>：載入一個數字、把兩個數字相加、比較、跳到清單的另一個位置。<b>核心</b>（core）是 CPU 裡一個接一個執行指令的部分，由時脈驅動：2.9 GHz 代表每秒 29 億次 tick，一個簡單的指令大約花一次 tick。核心在<b>暫存器</b>（register）上工作：核心裡面幾十個小格子，每格放一個數字。其中一個暫存器（program counter）記著下一個要跑的指令在哪裡。</p>
+<p lang="en">A CPU has several cores, so several programs really run at the same moment. The laptop we ran this course's examples on:</p>
+<p lang="zh-Hant">一顆 CPU 有好幾個核心，所以好幾個程式真的可以在同一刻一起跑。我們跑這堂課範例的筆電：</p>
+<pre class="term"><span class="ok">$ lscpu</span>     <span class="m"># selected lines</span>
+CPU(s):                                  16
+Thread(s) per core:                      2
+Core(s) per socket:                      8
+CPU max MHz:                             2901.0000
+L1d cache:                               256 KiB (8 instances)
+L2 cache:                                4 MiB (8 instances)
+L3 cache:                                8 MiB (2 instances)</pre>
+<p lang="en">8 cores, each able to run 2 streams of instructions, so Linux sees 16 CPUs. The <code>cache</code> lines come next.</p>
+<p lang="zh-Hant">8 個核心，每個能同時跑 2 串指令，所以 Linux 看到 16 個 CPU。<code>cache</code> 那幾行接下來會說明。</p>
+
+<h3><span lang="en">Where data lives: fast and small, or big and slow</span><span lang="zh-Hant">資料放在哪：快而小，或大而慢</span></h3>
+<p lang="en">A core can only compute on what is in its registers, so data must be brought in from somewhere. There are four levels, and <mark>each step down is bigger, cheaper and slower</mark>:</p>
+<p lang="zh-Hant">核心只能運算暫存器裡的東西，所以資料得從某個地方搬進來。一共有四層，<mark>每往下一層就更大、更便宜、也更慢</mark>：</p>
+<ul>
+  <li><span lang="en"><b>Registers</b>: inside the core. A few hundred bytes. Ready within the tick.</span><span lang="zh-Hant"><b>暫存器</b>：在核心裡面。幾百個位元組。在同一個 tick 內就能用。</span></li>
+  <li><span lang="en"><b>Cache</b>: on the CPU chip, in levels L1, L2 and L3. Kilobytes to megabytes. It keeps copies of what was used recently, automatically: programs never manage it.</span><span lang="zh-Hant"><b>快取</b>（cache）：在 CPU 晶片上，分成 L1、L2、L3 三層。KB 到 MB 等級。它會自動保留最近用過的資料的副本：程式從來不用管它。</span></li>
+  <li><span lang="en"><b>RAM</b>: separate chips next to the CPU. Gigabytes. Holds every running program and its data. Emptied at power off.</span><span lang="zh-Hant"><b>RAM</b>：CPU 旁邊獨立的晶片。GB 等級。放著每個正在跑的程式和它的資料。斷電就清空。</span></li>
+  <li><span lang="en"><b>SSD</b>: storage. Hundreds of gigabytes. Holds files, and keeps them when the power is off.</span><span lang="zh-Hant"><b>SSD</b>：儲存裝置。數百 GB。放檔案，斷電後還在。</span></li>
+</ul>
+<figure class="wide">
+<svg class="fig" viewBox="0 0 760 270" role="img" aria-label="Where each kind of memory physically is. Registers: a small block inside each core. Cache: on the CPU chip; L1 and L2 next to each of the 8 cores, L3 shared in the middle. RAM: chips on memory sticks next to the CPU. SSD: an M.2 card with a controller and flash chips, further away on the board. Closer to the core is faster and smaller; further away is bigger and slower; only the SSD keeps data at power off.">
+<rect x="15" y="14" width="175" height="140" rx="8" fill="#fff" stroke="#c3ccd8"/>
+<rect x="200" y="14" width="175" height="140" rx="8" fill="#fff" stroke="#c3ccd8"/>
+<rect x="385" y="14" width="175" height="140" rx="8" fill="#fff" stroke="#c3ccd8"/>
+<rect x="570" y="14" width="175" height="140" rx="8" fill="#fff" stroke="#c3ccd8"/>
+<rect x="37" y="30" width="131" height="110" rx="6" fill="#e6e9ee" stroke="#3d4a5c" stroke-width="1.5"/>
+<text x="47" y="48" font-size="11" font-weight="700" fill="#3d4a5c" lang="en">one core</text><text x="47" y="48" font-size="11" font-weight="700" fill="#3d4a5c" lang="zh-Hant">一個核心</text>
+<rect x="47" y="58" width="40" height="30" rx="3" fill="#fff" stroke="#3d4a5c"/><text x="67" y="77" font-size="10" text-anchor="middle" fill="#3d4a5c" class-="mono">ALU</text>
+<rect x="47" y="96" width="40" height="34" rx="3" fill="#dcf5f1" stroke="#00a896" stroke-dasharray="3 2"/><text x="67" y="110" font-size="10" text-anchor="middle" fill="#0d1b2a">L1</text><text x="67" y="122" font-size="10" text-anchor="middle" fill="#0d1b2a">L2</text>
+<rect x="97" y="58" width="13" height="11" rx="2" fill="#00a896"/>
+<rect x="113" y="58" width="13" height="11" rx="2" fill="#00a896"/>
+<rect x="129" y="58" width="13" height="11" rx="2" fill="#00a896"/>
+<rect x="145" y="58" width="13" height="11" rx="2" fill="#00a896"/>
+<rect x="97" y="73" width="13" height="11" rx="2" fill="#00a896"/>
+<rect x="113" y="73" width="13" height="11" rx="2" fill="#00a896"/>
+<rect x="129" y="73" width="13" height="11" rx="2" fill="#00a896"/>
+<rect x="145" y="73" width="13" height="11" rx="2" fill="#00a896"/>
+<rect x="97" y="88" width="13" height="11" rx="2" fill="#00a896"/>
+<rect x="113" y="88" width="13" height="11" rx="2" fill="#00a896"/>
+<rect x="129" y="88" width="13" height="11" rx="2" fill="#00a896"/>
+<rect x="145" y="88" width="13" height="11" rx="2" fill="#00a896"/>
+<rect x="97" y="103" width="13" height="11" rx="2" fill="#00a896"/>
+<rect x="113" y="103" width="13" height="11" rx="2" fill="#00a896"/>
+<rect x="129" y="103" width="13" height="11" rx="2" fill="#00a896"/>
+<rect x="145" y="103" width="13" height="11" rx="2" fill="#00a896"/>
+<rect x="97" y="118" width="13" height="11" rx="2" fill="#00a896"/>
+<rect x="113" y="118" width="13" height="11" rx="2" fill="#00a896"/>
+<rect x="129" y="118" width="13" height="11" rx="2" fill="#00a896"/>
+<rect x="145" y="118" width="13" height="11" rx="2" fill="#00a896"/>
+<rect x="93" y="54" width="70" height="80" rx="4" fill="none" stroke="#00a896" stroke-width="2"/>
+<rect x="214" y="26" width="147" height="118" rx="5" fill="#1c2e44"/>
+<rect x="222" y="34" width="30" height="26" rx="2" fill="#e6e9ee"/><rect x="241" y="36" width="9" height="22" rx="1" fill="#dcf5f1" stroke="#00a896"/>
+<rect x="256" y="34" width="30" height="26" rx="2" fill="#e6e9ee"/><rect x="275" y="36" width="9" height="22" rx="1" fill="#dcf5f1" stroke="#00a896"/>
+<rect x="290" y="34" width="30" height="26" rx="2" fill="#e6e9ee"/><rect x="309" y="36" width="9" height="22" rx="1" fill="#dcf5f1" stroke="#00a896"/>
+<rect x="324" y="34" width="30" height="26" rx="2" fill="#e6e9ee"/><rect x="343" y="36" width="9" height="22" rx="1" fill="#dcf5f1" stroke="#00a896"/>
+<rect x="222" y="110" width="30" height="26" rx="2" fill="#e6e9ee"/><rect x="241" y="112" width="9" height="22" rx="1" fill="#dcf5f1" stroke="#00a896"/>
+<rect x="256" y="110" width="30" height="26" rx="2" fill="#e6e9ee"/><rect x="275" y="112" width="9" height="22" rx="1" fill="#dcf5f1" stroke="#00a896"/>
+<rect x="290" y="110" width="30" height="26" rx="2" fill="#e6e9ee"/><rect x="309" y="112" width="9" height="22" rx="1" fill="#dcf5f1" stroke="#00a896"/>
+<rect x="324" y="110" width="30" height="26" rx="2" fill="#e6e9ee"/><rect x="343" y="112" width="9" height="22" rx="1" fill="#dcf5f1" stroke="#00a896"/>
+<rect x="222" y="66" width="131" height="38" rx="3" fill="#00a896"/><text x="287" y="90" font-size="13" font-weight="700" text-anchor="middle" fill="#fff">L3</text>
+
+<g opacity="0.45"><rect x="397" y="54" width="151" height="44" rx="2" fill="#1f6b4a"/><rect x="403" y="60" width="14" height="22" rx="1" fill="#1c2e44"/><rect x="421" y="60" width="14" height="22" rx="1" fill="#1c2e44"/><rect x="439" y="60" width="14" height="22" rx="1" fill="#1c2e44"/><rect x="457" y="60" width="14" height="22" rx="1" fill="#1c2e44"/><rect x="475" y="60" width="14" height="22" rx="1" fill="#1c2e44"/><rect x="493" y="60" width="14" height="22" rx="1" fill="#1c2e44"/><rect x="511" y="60" width="14" height="22" rx="1" fill="#1c2e44"/><rect x="529" y="60" width="14" height="22" rx="1" fill="#1c2e44"/><rect x="399" y="88" width="147" height="8" fill="#c9a227"/><path d="M401 88 V96" stroke="#1f6b4a" stroke-width="1"/><path d="M406 88 V96" stroke="#1f6b4a" stroke-width="1"/><path d="M411 88 V96" stroke="#1f6b4a" stroke-width="1"/><path d="M416 88 V96" stroke="#1f6b4a" stroke-width="1"/><path d="M421 88 V96" stroke="#1f6b4a" stroke-width="1"/><path d="M426 88 V96" stroke="#1f6b4a" stroke-width="1"/><path d="M431 88 V96" stroke="#1f6b4a" stroke-width="1"/><path d="M436 88 V96" stroke="#1f6b4a" stroke-width="1"/><path d="M441 88 V96" stroke="#1f6b4a" stroke-width="1"/><path d="M446 88 V96" stroke="#1f6b4a" stroke-width="1"/><path d="M451 88 V96" stroke="#1f6b4a" stroke-width="1"/><path d="M456 88 V96" stroke="#1f6b4a" stroke-width="1"/><path d="M461 88 V96" stroke="#1f6b4a" stroke-width="1"/><path d="M466 88 V96" stroke="#1f6b4a" stroke-width="1"/><path d="M471 88 V96" stroke="#1f6b4a" stroke-width="1"/><path d="M476 88 V96" stroke="#1f6b4a" stroke-width="1"/><path d="M481 88 V96" stroke="#1f6b4a" stroke-width="1"/><path d="M486 88 V96" stroke="#1f6b4a" stroke-width="1"/><path d="M491 88 V96" stroke="#1f6b4a" stroke-width="1"/><path d="M496 88 V96" stroke="#1f6b4a" stroke-width="1"/><path d="M501 88 V96" stroke="#1f6b4a" stroke-width="1"/><path d="M506 88 V96" stroke="#1f6b4a" stroke-width="1"/><path d="M511 88 V96" stroke="#1f6b4a" stroke-width="1"/><path d="M516 88 V96" stroke="#1f6b4a" stroke-width="1"/><path d="M521 88 V96" stroke="#1f6b4a" stroke-width="1"/><path d="M526 88 V96" stroke="#1f6b4a" stroke-width="1"/><path d="M531 88 V96" stroke="#1f6b4a" stroke-width="1"/><path d="M536 88 V96" stroke="#1f6b4a" stroke-width="1"/><path d="M541 88 V96" stroke="#1f6b4a" stroke-width="1"/><rect x="467" y="90" width="6" height="8" fill="#fff"/></g>
+<g opacity="1"><rect x="397" y="70" width="151" height="44" rx="2" fill="#1f6b4a"/><rect x="403" y="76" width="14" height="22" rx="1" fill="#1c2e44"/><rect x="421" y="76" width="14" height="22" rx="1" fill="#1c2e44"/><rect x="439" y="76" width="14" height="22" rx="1" fill="#1c2e44"/><rect x="457" y="76" width="14" height="22" rx="1" fill="#1c2e44"/><rect x="475" y="76" width="14" height="22" rx="1" fill="#1c2e44"/><rect x="493" y="76" width="14" height="22" rx="1" fill="#1c2e44"/><rect x="511" y="76" width="14" height="22" rx="1" fill="#1c2e44"/><rect x="529" y="76" width="14" height="22" rx="1" fill="#1c2e44"/><rect x="399" y="104" width="147" height="8" fill="#c9a227"/><path d="M401 104 V112" stroke="#1f6b4a" stroke-width="1"/><path d="M406 104 V112" stroke="#1f6b4a" stroke-width="1"/><path d="M411 104 V112" stroke="#1f6b4a" stroke-width="1"/><path d="M416 104 V112" stroke="#1f6b4a" stroke-width="1"/><path d="M421 104 V112" stroke="#1f6b4a" stroke-width="1"/><path d="M426 104 V112" stroke="#1f6b4a" stroke-width="1"/><path d="M431 104 V112" stroke="#1f6b4a" stroke-width="1"/><path d="M436 104 V112" stroke="#1f6b4a" stroke-width="1"/><path d="M441 104 V112" stroke="#1f6b4a" stroke-width="1"/><path d="M446 104 V112" stroke="#1f6b4a" stroke-width="1"/><path d="M451 104 V112" stroke="#1f6b4a" stroke-width="1"/><path d="M456 104 V112" stroke="#1f6b4a" stroke-width="1"/><path d="M461 104 V112" stroke="#1f6b4a" stroke-width="1"/><path d="M466 104 V112" stroke="#1f6b4a" stroke-width="1"/><path d="M471 104 V112" stroke="#1f6b4a" stroke-width="1"/><path d="M476 104 V112" stroke="#1f6b4a" stroke-width="1"/><path d="M481 104 V112" stroke="#1f6b4a" stroke-width="1"/><path d="M486 104 V112" stroke="#1f6b4a" stroke-width="1"/><path d="M491 104 V112" stroke="#1f6b4a" stroke-width="1"/><path d="M496 104 V112" stroke="#1f6b4a" stroke-width="1"/><path d="M501 104 V112" stroke="#1f6b4a" stroke-width="1"/><path d="M506 104 V112" stroke="#1f6b4a" stroke-width="1"/><path d="M511 104 V112" stroke="#1f6b4a" stroke-width="1"/><path d="M516 104 V112" stroke="#1f6b4a" stroke-width="1"/><path d="M521 104 V112" stroke="#1f6b4a" stroke-width="1"/><path d="M526 104 V112" stroke="#1f6b4a" stroke-width="1"/><path d="M531 104 V112" stroke="#1f6b4a" stroke-width="1"/><path d="M536 104 V112" stroke="#1f6b4a" stroke-width="1"/><path d="M541 104 V112" stroke="#1f6b4a" stroke-width="1"/><rect x="467" y="106" width="6" height="8" fill="#fff"/></g>
+<rect x="395" y="50" width="155" height="68" rx="4" fill="none" stroke="#00a896" stroke-width="2"/>
+<text x="472" y="132" font-size="10" text-anchor="middle" fill="#5a6779" lang="en">memory sticks</text><text x="472" y="132" font-size="10" text-anchor="middle" fill="#5a6779" lang="zh-Hant">記憶體條</text>
+<rect x="586" y="66" width="146" height="40" rx="3" fill="#1f6b4a"/>
+<rect x="586" y="66" width="8" height="40" fill="#c9a227"/><rect x="586" y="76" width="8" height="5" fill="#fff"/>
+<rect x="602" y="73" width="24" height="24" rx="2" fill="#3d4a5c"/><text x="614" y="88" font-size="7.5" text-anchor="middle" fill="#fff" class-="mono">ctrl</text>
+<rect x="634" y="71" width="38" height="30" rx="2" fill="#1c2e44"/><rect x="678" y="71" width="38" height="30" rx="2" fill="#1c2e44"/>
+<text x="675" y="90" font-size="8" text-anchor="middle" fill="#9fb0c2" class-="mono">flash</text>
+<circle cx="732" cy="86" r="5" fill="#fff"/>
+<rect x="581" y="60" width="156" height="52" rx="4" fill="none" stroke="#00a896" stroke-width="2"/>
+<text x="657" y="132" font-size="10" text-anchor="middle" fill="#5a6779" lang="en">an M.2 card on the board</text><text x="657" y="132" font-size="10" text-anchor="middle" fill="#5a6779" lang="zh-Hant">主機板上的 M.2 卡</text>
+<text x="19" y="176" font-size="15" font-weight="700" fill="#0d1b2a" lang="en">Registers</text><text x="19" y="176" font-size="15" font-weight="700" fill="#0d1b2a" lang="zh-Hant">暫存器</text>
+<text x="19" y="194" font-size="12" fill="#5a6779" lang="en">inside each core</text><text x="19" y="194" font-size="12" fill="#5a6779" lang="zh-Hant">在每個核心裡面</text>
+<text x="19" y="212" font-size="12" fill="#8a6500" font-weight="700" class-="mono" lang="en">≈0.3 ns · 100s of bytes</text><text x="19" y="212" font-size="12" fill="#8a6500" font-weight="700" class-="mono" lang="zh-Hant">≈0.3 ns · 幾百位元組</text>
+<text x="204" y="176" font-size="15" font-weight="700" fill="#0d1b2a" lang="en">Cache</text><text x="204" y="176" font-size="15" font-weight="700" fill="#0d1b2a" lang="zh-Hant">快取</text>
+<text x="204" y="194" font-size="12" fill="#5a6779" lang="en">on the CPU chip</text><text x="204" y="194" font-size="12" fill="#5a6779" lang="zh-Hant">在 CPU 晶片上</text>
+<text x="204" y="212" font-size="12" fill="#8a6500" font-weight="700" class-="mono">1.7–12 ns · KiB–MiB</text>
+<text x="389" y="176" font-size="15" font-weight="700" fill="#0d1b2a" lang="en">RAM</text><text x="389" y="176" font-size="15" font-weight="700" fill="#0d1b2a" lang="zh-Hant">RAM</text>
+<text x="389" y="194" font-size="12" fill="#5a6779" lang="en">next to the CPU</text><text x="389" y="194" font-size="12" fill="#5a6779" lang="zh-Hant">在 CPU 旁邊</text>
+<text x="389" y="212" font-size="12" fill="#8a6500" font-weight="700" class-="mono">≈100 ns · 22 GiB</text>
+<text x="574" y="176" font-size="15" font-weight="700" fill="#0d1b2a" lang="en">SSD</text><text x="574" y="176" font-size="15" font-weight="700" fill="#0d1b2a" lang="zh-Hant">SSD</text>
+<text x="574" y="194" font-size="12" fill="#5a6779" lang="en">further away, on the board</text><text x="574" y="194" font-size="12" fill="#5a6779" lang="zh-Hant">更遠，在主機板上</text>
+<text x="574" y="212" font-size="12" fill="#8a6500" font-weight="700" class-="mono">65 µs · 916 GB</text>
+<path d="M20 240 H732" stroke="#3d4a5c" stroke-width="2"/><polygon points="742,240 730,234 730,246" fill="#3d4a5c"/>
+<text x="20" y="260" font-size="12" fill="#3d4a5c" lang="en">closer to the core: faster and smaller</text><text x="20" y="260" font-size="12" fill="#3d4a5c" lang="zh-Hant">離核心越近：越快、越小</text>
+<text x="740" y="260" font-size="12" fill="#3d4a5c" text-anchor="end" lang="en">further away: bigger and slower · only the SSD keeps data at power off</text><text x="740" y="260" font-size="12" fill="#3d4a5c" text-anchor="end" lang="zh-Hant">越遠：越大、越慢 · 只有 SSD 斷電後還留著資料</text>
+</svg>
+<figcaption><span lang="en">Where each one physically is. Drawn simply: a real chip has its parts in other shapes, but in this order. The numbers are the ones measured below.</span><span lang="zh-Hant">它們實際上在哪裡。這是簡化的圖：真的晶片裡各部分形狀不同，但位置順序就是這樣。數字是下面量到的。</span></figcaption>
+</figure>
+
+<p lang="en">How much slower? We measured it on the same laptop. <code>memory_latency.cpp</code> follows a chain of pointers through arrays of growing size, so every read waits for the one before. A small array stays in the cache; a big one only fits in RAM. A second small program read 4 KiB at random places in a 1 GiB file on the SSD, bypassing the cache:</p>
+<p lang="zh-Hant">慢多少？我們在同一台筆電上量過。<code>memory_latency.cpp</code> 在越來越大的陣列裡沿著一串指標走，所以每次讀取都要等前一次。小陣列會留在快取裡；大陣列只放得進 RAM。另一個小程式在 SSD 上一個 1 GiB 的檔案裡隨機讀 4 KiB，不經過快取：</p>
+<pre class="term"><span class="ok">$ ./memory_latency</span>
+      16 KiB     1.7 ns per read      <span class="m">fits in L1</span>
+     128 KiB     4.1 ns per read      <span class="m">fits in L2</span>
+    1024 KiB    11.6 ns per read      <span class="m">fits in L3</span>
+    4096 KiB    29.3 ns per read      <span class="m">L3 is full: partly RAM</span>
+   65536 KiB    94.0 ns per read      <span class="m">RAM</span>
+  524288 KiB   119.7 ns per read      <span class="m">RAM</span>
+<span class="ok">$ python3 ssd_latency.py</span>
+65 us per 4 KiB read                  <span class="m">SSD</span></pre>
+
+<figure class="wide">
+<svg class="fig" viewBox="0 0 760 270" role="img" aria-label="Time for one read, on a log scale, measured on our laptop. Registers about 0.3 ns, one clock tick. L1 cache 1.7 ns. L2 cache 4.1 ns. L3 cache 11.6 ns. RAM about 100 ns. SSD 65 microseconds. If an L1 read took one second, RAM would take about a minute and the SSD about 11 hours.">
+  <text x="20" y="24" font-size="12.5" fill="#5a6779" lang="en">time for one read (log scale: each grid line is 10× more)</text>
+  <text x="20" y="24" font-size="12.5" fill="#5a6779" lang="zh-Hant">讀一次要多久（對數刻度：每一條格線多 10 倍）</text>
+  <text x="600" y="24" font-size="12.5" fill="#5a6779" lang="en">if L1 took 1 s</text>
+  <text x="600" y="24" font-size="12.5" fill="#5a6779" lang="zh-Hant">如果 L1 要 1 秒</text>
+  <g stroke="#e8ecf1">
+    <path d="M190 34 V258"/><path d="M257 34 V258"/><path d="M323 34 V258"/><path d="M390 34 V258"/><path d="M457 34 V258"/><path d="M523 34 V258"/><path d="M590 34 V258"/>
+  </g>
+  <g font-size="10.5" fill="#9aa5b3" text-anchor="middle" class="mono">
+    <text x="190" y="268">0.1 ns</text><text x="257" y="268">1 ns</text><text x="323" y="268">10 ns</text><text x="390" y="268">100 ns</text><text x="457" y="268">1 µs</text><text x="523" y="268">10 µs</text><text x="590" y="268">100 µs</text>
+  </g>
+  <g font-size="14" font-weight="700" fill="#0d1b2a">
+    <text x="20" y="58" lang="en">Registers</text><text x="20" y="58" lang="zh-Hant">暫存器</text>
+    <text x="20" y="94">L1 cache</text>
+    <text x="20" y="130">L2 cache</text>
+    <text x="20" y="166">L3 cache</text>
+    <text x="20" y="202">RAM</text>
+    <text x="20" y="238">SSD</text>
+  </g>
+  <g font-size="11.5" fill="#5a6779">
+    <text x="20" y="72" lang="en">hundreds of bytes</text><text x="20" y="72" lang="zh-Hant">幾百個位元組</text>
+    <text x="20" y="108">32 KiB / core</text>
+    <text x="20" y="144">512 KiB / core</text>
+    <text x="20" y="180">8 MiB</text>
+    <text x="20" y="216">22 GiB</text>
+    <text x="20" y="252">916 GB</text>
+  </g>
+  <g fill="#f6edd0" stroke="#8a6500" stroke-width="1.2">
+    <rect x="190" y="46" width="35" height="22" rx="3"/>
+    <rect x="190" y="82" width="82" height="22" rx="3"/>
+    <rect x="190" y="118" width="107" height="22" rx="3"/>
+    <rect x="190" y="154" width="137" height="22" rx="3"/>
+    <rect x="190" y="190" width="198" height="22" rx="3"/>
+    <rect x="190" y="226" width="390" height="22" rx="3" fill="#8a6500"/>
+  </g>
+  <g font-size="12.5" class="mono" fill="#0d1b2a">
+    <text x="232" y="62" lang="en">≈0.3 ns (1 tick)</text><text x="232" y="62" lang="zh-Hant">≈0.3 ns（1 tick）</text>
+    <text x="279" y="98">1.7 ns</text>
+    <text x="304" y="134">4.1 ns</text>
+    <text x="334" y="170">11.6 ns</text>
+    <text x="395" y="206">≈100 ns</text>
+    <text x="500" y="242" fill="#fff" font-weight="700">65 µs</text>
+  </g>
+  <g font-size="13" fill="#8a6500" font-weight="700">
+    <text x="600" y="62" lang="en">0.2 s</text><text x="600" y="62" lang="zh-Hant">0.2 秒</text>
+    <text x="600" y="98" lang="en">1 s</text><text x="600" y="98" lang="zh-Hant">1 秒</text>
+    <text x="600" y="134" lang="en">2.4 s</text><text x="600" y="134" lang="zh-Hant">2.4 秒</text>
+    <text x="600" y="170" lang="en">7 s</text><text x="600" y="170" lang="zh-Hant">7 秒</text>
+    <text x="600" y="206" lang="en">about a minute</text><text x="600" y="206" lang="zh-Hant">大約 1 分鐘</text>
+    <text x="600" y="242" lang="en">about 11 hours</text><text x="600" y="242" lang="zh-Hant">大約 11 小時</text>
+  </g>
+</svg>
+<figcaption><span lang="en">Measured on our laptop, except the register line, which is one clock tick at 2.9 GHz. Sizes are from <code>lscpu</code>, <code>free -h</code> and <code>df -h</code>. Other computers differ in the numbers, never in the order.</span><span lang="zh-Hant">在我們的筆電上量的，只有暫存器那一行是用 2.9 GHz 的一次 tick 算出來的。容量來自 <code>lscpu</code>、<code>free -h</code> 和 <code>df -h</code>。別的電腦數字會不一樣，但順序永遠一樣。</span></figcaption>
+</figure>
+
+<p lang="en"><mark>A read from the SSD takes as long as about 40,000 reads from the cache.</mark> That is why a program is copied from the SSD into RAM before it runs, and why the cache exists at all: most of the time, the next thing a program needs is close to the last thing it used, and the cache already has it.</p>
+<p lang="zh-Hant"><mark>從 SSD 讀一次的時間，大約可以從快取讀 40,000 次。</mark>這就是為什麼程式要先從 SSD 複製到 RAM 才能執行，也是快取存在的理由：大部分時候，程式下一個需要的東西就在它剛用過的東西附近，而快取裡已經有了。</p>
+
+<h3><span lang="en">The kernel shares all of this</span><span lang="zh-Hant">核心負責分配這一切</span></h3>
+<p lang="en">Hundreds of programs want the same cores, the same RAM and the same devices. The <span class="who os">Linux kernel</span> is the program that hands them out: which program runs on which core and for how long, which part of RAM belongs to whom, who may use which device. Every other program has to ask the kernel. <mark>The rest of this course is about the kernel's rules</mark>: for running programs (processes), for stopping them (signals), and for files and devices (permissions).</p>
+<p lang="zh-Hant">幾百個程式都想用同樣的核心、同樣的 RAM、同樣的裝置。<span class="who os">Linux 核心</span>就是負責分配的那個程式：哪個程式在哪個核心上跑、跑多久，RAM 的哪一塊屬於誰，誰可以用哪個裝置。其他每個程式都得去問核心。<mark>這堂課接下來講的，就是核心的規則</mark>：關於正在跑的程式（process）、關於停止它們（signal），以及關於檔案和裝置（權限）。</p>
+
+<div class="quiz">
+  <button><span lang="en"><b>RAM is full, so Linux moves some of it to the SSD (this is called <i>swap</i>).</b> What happens to the robot?</span><span lang="zh-Hant"><b>RAM 滿了，Linux 把一部分搬到 SSD 上（這叫 <i>swap</i>）。</b>機器人會怎樣？</span><span class="ans"><span lang="en">Everything slows down, badly: data that took 100 ns to read now takes tens of microseconds, hundreds of times longer. Control loops come late. <code>free -h</code> shows how much swap is in use.</span><span lang="zh-Hant">所有東西都變得很慢：原本 100 ns 就讀得到的資料，現在要幾十微秒，慢了幾百倍。控制迴圈開始遲到。<code>free -h</code> 會顯示用了多少 swap。</span></span></button>
+  <button><span lang="en"><b>A node starts slowly the first time and fast the second time.</b> Why?</span><span lang="zh-Hant"><b>一個 node 第一次啟動很慢，第二次就很快。</b>為什麼？</span><span class="ans"><span lang="en">The first time, its files (Python, the libraries) are read from the SSD. The kernel keeps a copy in otherwise unused RAM, so the second start reads them from RAM. That copy is the <code>buff/cache</code> column of <code>free -h</code>.</span><span lang="zh-Hant">第一次，它的檔案（Python、函式庫）要從 SSD 讀。核心會把一份副本留在沒在用的 RAM 裡，所以第二次啟動是從 RAM 讀。那份副本就是 <code>free -h</code> 的 <code>buff/cache</code> 欄。</span></span></button>
+  <button><span lang="en"><b>A core does 2.9 billion ticks a second.</b> How many ticks does it wait for one read from RAM?</span><span lang="zh-Hant"><b>一個核心每秒 29 億次 tick。</b>從 RAM 讀一次，它要等幾個 tick？</span><span class="ans"><span lang="en">About 300 (100 ns × 2.9 per ns). A fast CPU spends much of its time waiting for data, which is why where your data lives matters. OS‑2 goes further.</span><span lang="zh-Hant">大約 300 個（100 ns × 每 ns 2.9 個）。快的 CPU 有很多時間都在等資料，所以資料放在哪裡很重要。OS‑2 會講得更深。</span></span></button>
+</div>
+
+<div class="case robot">
+  <div class="case-h"><span lang="en">On a robot</span><span lang="zh-Hant">在機器人上</span></div>
+  <div class="case-t"><span lang="en">Two computers, the same ideas</span><span lang="zh-Hant">兩台電腦，同樣的觀念</span></div>
+  <p lang="en">A robot usually carries two kinds of computer. The <b>robot computer</b> runs Linux and ROS: a multi-core CPU, gigabytes of RAM, an SSD, and often a GPU (on Jetson-class boards the GPU shares the same RAM). The <b>microcontroller</b> (MCU) drives the motors and reads the encoders: one core at a few hundred MHz, around a megabyte of RAM, no SSD (its program sits in flash memory, which keeps it at power off), and no Linux. The levels and the trade-offs are the same; only the numbers shrink. The fake serial port in this course stands for the wire between them.</p>
+  <p lang="zh-Hant">機器人通常帶著兩種電腦。<b>機器人電腦</b>跑 Linux 和 ROS：多核心 CPU、好幾 GB 的 RAM、SSD，常常還有 GPU（在 Jetson 這類板子上，GPU 跟 CPU 共用同一塊 RAM）。<b>微控制器</b>（MCU）驅動馬達、讀 encoder：一個幾百 MHz 的核心、大約 1 MB 的 RAM、沒有 SSD（程式放在 flash 記憶體裡，斷電也還在），也沒有 Linux。層級和取捨都一樣，只是數字變小。這堂課裡的假序列埠，代表的就是它們之間的那條線。</p>
+</div>
+
+<div class="try">
+  <div class="try-h"><span lang="en">Try it</span><span lang="zh-Hant">動手試</span></div>
+  <div class="try-t"><span lang="en">Measure your own computer</span><span lang="zh-Hant">量你自己的電腦</span></div>
+  <p lang="en">Start the club's Humble container from this worksheet's folder (every Try-it box uses it; see <code>ros2-basics/verify/README.md</code> to build the image once), or use any Linux laptop with <code>g++</code>. Before you run it, guess your RAM number.</p>
+  <p lang="zh-Hant">在這份學習單的資料夾裡啟動社團的 Humble 容器（每個「動手試」都用它；image 照 <code>ros2-basics/verify/README.md</code> 建一次就好），或用任何有 <code>g++</code> 的 Linux 筆電。執行之前，先猜你的 RAM 數字。</p>
+<pre data-lang="sh">docker run -it --rm --name os1 -v "$PWD/code":/code dit-ros2-tutorial:humble bash
+cd /code
+g++ -O2 -o /tmp/memory_latency memory_latency.cpp &amp;&amp; /tmp/memory_latency
+python3 ssd_latency.py      # writes a 1 GiB file in /code, then deletes it
+lscpu; free -h; df -h /</pre>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="process"><small><span lang="en">Part 3</span><span lang="zh-Hant">第 3 部分</span></small><span lang="en">A node is a process</span><span lang="zh-Hant">node 就是一個 process</span></h2>
+
+<h3><span lang="en">A program is a file; a process is a program running</span><span lang="zh-Hant">程式是檔案；process 是正在跑的程式</span></h3>
+<p lang="en"><code>driver.py</code> is a file on the SSD. So is <code>/usr/bin/python3</code>, the program that runs it, and so are the ROS libraries it uses. To run a program, the <span class="who os">kernel</span> copies it from the SSD into RAM (Part 2 showed why) and gives it a core to run on. The running program, together with everything the kernel keeps track of for it, is a <b>process</b>.</p>
+<p lang="zh-Hant"><code>driver.py</code> 是 SSD 上的一個檔案。跑它的程式 <code>/usr/bin/python3</code> 也是，它用到的 ROS 函式庫也是。要跑一個程式，<span class="who os">核心</span>會把它從 SSD 複製到 RAM（第 2 部分說明了為什麼），再給它一個核心去跑。正在跑的程式，加上核心為它記錄的一切，就是 <b>process</b>。</p>
+
+<figure class="wide">
+<svg class="fig" viewBox="0 0 760 250" role="img" aria-label="Left, the SSD holds files: /usr/bin/python3, /code/driver.py and /opt/ros/humble/lib/librcl.so. An arrow labelled exec, load into memory, points right to RAM, which holds process 474: its parent is 471, its code is python3 plus driver.py plus the ROS libraries, it has open files such as /tmp/mcu, and 11 threads.">
+  <rect x="20" y="30" width="270" height="190" rx="10" fill="#fff" stroke="#3d4a5c" stroke-width="1.5"/>
+  <text x="36" y="56" font-size="15" font-weight="700" fill="#0d1b2a" lang="en">SSD · files</text>
+  <text x="36" y="56" font-size="15" font-weight="700" fill="#0d1b2a" lang="zh-Hant">SSD · 檔案</text>
+  <text x="36" y="76" font-size="12.5" fill="#5a6779" lang="en">kept when the power is off</text>
+  <text x="36" y="76" font-size="12.5" fill="#5a6779" lang="zh-Hant">斷電後還在</text>
+  <rect x="36" y="92" width="238" height="30" rx="5" fill="#e6e9ee" stroke="#3d4a5c"/>
+  <text x="48" y="112" font-size="13" class="mono" fill="#0d1b2a">/usr/bin/python3</text>
+  <rect x="36" y="130" width="238" height="30" rx="5" fill="#e3edfb" stroke="#2266d3"/>
+  <text x="48" y="150" font-size="13" class="mono" fill="#2266d3">/code/driver.py</text>
+  <rect x="36" y="168" width="238" height="30" rx="5" fill="#e6e9ee" stroke="#3d4a5c"/>
+  <text x="48" y="188" font-size="13" class="mono" fill="#0d1b2a">/opt/ros/…/librcl.so</text>
+
+  <g fill="#6b6f76"><path d="M296 125 H356" stroke="#6b6f76" stroke-width="2.5"/><polygon points="366,125 355,120 355,130"/></g>
+  <text x="331" y="112" font-size="12.5" text-anchor="middle" font-weight="700" fill="#6b6f76">exec</text>
+  <text x="331" y="146" font-size="11.5" text-anchor="middle" fill="#6b6f76" lang="en">load into</text>
+  <text x="331" y="160" font-size="11.5" text-anchor="middle" fill="#6b6f76" lang="en">memory</text>
+  <text x="331" y="146" font-size="11.5" text-anchor="middle" fill="#6b6f76" lang="zh-Hant">載入</text>
+  <text x="331" y="160" font-size="11.5" text-anchor="middle" fill="#6b6f76" lang="zh-Hant">記憶體</text>
+
+  <rect x="372" y="30" width="368" height="190" rx="10" fill="#fff" stroke="#3d4a5c" stroke-width="1.5"/>
+  <text x="388" y="56" font-size="15" font-weight="700" fill="#0d1b2a" lang="en">RAM · processes</text>
+  <text x="388" y="56" font-size="15" font-weight="700" fill="#0d1b2a" lang="zh-Hant">RAM · process</text>
+  <text x="388" y="76" font-size="12.5" fill="#5a6779" lang="en">emptied at power off</text>
+  <text x="388" y="76" font-size="12.5" fill="#5a6779" lang="zh-Hant">斷電就清空</text>
+  <rect x="388" y="88" width="336" height="118" rx="6" fill="#e3edfb" stroke="#2266d3" stroke-width="1.5"/>
+  <text x="402" y="110" font-size="14" font-weight="700" fill="#2266d3" lang="en">process 39 · parent 36</text>
+  <text x="402" y="110" font-size="14" font-weight="700" fill="#2266d3" lang="zh-Hant">process 39 · 父 process 36</text>
+  <text x="402" y="134" font-size="12.5" fill="#0d1b2a" lang="en">code: python3 + driver.py + libraries</text>
+  <text x="402" y="134" font-size="12.5" fill="#0d1b2a" lang="zh-Hant">程式碼：python3 + driver.py + 函式庫</text>
+  <text x="402" y="156" font-size="12.5" fill="#0d1b2a" lang="en">open files: /tmp/mcu, sockets, …</text>
+  <text x="402" y="156" font-size="12.5" fill="#0d1b2a" lang="zh-Hant">開著的檔案：/tmp/mcu、socket…</text>
+  <text x="402" y="178" font-size="12.5" fill="#0d1b2a" lang="en">11 threads · 52 MB of RAM</text>
+  <text x="402" y="178" font-size="12.5" fill="#0d1b2a" lang="zh-Hant">11 條執行緒 · 52 MB RAM</text>
+  <text x="402" y="198" font-size="12.5" fill="#0d1b2a" lang="en">runs as: root (user 0)</text>
+  <text x="402" y="198" font-size="12.5" fill="#0d1b2a" lang="zh-Hant">身分：root（使用者 0）</text>
+</svg>
+<figcaption><span lang="en">One program file can become many processes; each process has its own number, parent, memory and open files. The numbers are from <code>/proc/39/status</code> below.</span><span lang="zh-Hant">同一個程式檔可以變成很多個 process；每個 process 都有自己的編號、父 process、記憶體和開著的檔案。數字來自下面的 <code>/proc/39/status</code>。</span></figcaption>
+</figure>
+
+<p lang="en">The kernel gives every process a number, the <b>PID</b> (process ID). <mark>Every node is one process, with its own PID.</mark> Two nodes in one launch are two processes; the same node started twice is two processes, too.</p>
+<p lang="zh-Hant">核心給每個 process 一個編號：<b>PID</b>（process ID）。<mark>每個 node 都是一個 process，有自己的 PID。</mark>一個 launch 裡的兩個 node 是兩個 process；同一個 node 啟動兩次，也是兩個 process。</p>
+
+<h3><span lang="en">What a shell is</span><span lang="zh-Hant">shell 是什麼</span></h3>
+<p lang="en">When you open a terminal, the window only shows text. The program you are actually typing to is a <b>shell</b>, usually <code>bash</code>. A shell does one job, over and over: read a command, start the program you named, wait until it finishes, then show the prompt (<code>$</code>) again. The shell is a process, and so is every program it starts for you.</p>
+<p lang="zh-Hant">打開終端機時，那個視窗只負責顯示文字。你真正在對它打字的程式叫 <b>shell</b>，通常是 <code>bash</code>。shell 一直重複做一件事：讀一個指令、啟動你指定的程式、等它結束，然後再顯示提示字元（<code>$</code>）。shell 是一個 process，它幫你啟動的每個程式也都是。</p>
+
+<h3><span lang="en">Every process has a parent</span><span lang="zh-Hant">每個 process 都有父 process</span></h3>
+<p lang="en">A process never appears out of nothing: another process starts it, and that one is its <b>parent</b>. Linux does this in two steps, and it is easiest to see in code. Here is everything a shell does with one command, in C. The command is fixed to <code>ps</code>, which lists processes:</p>
+<p lang="zh-Hant">process 不會憑空出現：一定是另一個 process 啟動它，那個 process 就是它的<b>父 process</b>（parent）。Linux 分兩步完成這件事，用程式碼看最清楚。下面是 shell 處理一個指令時做的全部事情，用 C 寫的。指令固定是 <code>ps</code>：列出 process 的程式。</p>
+
+<pre data-lang="cpp"><span class="hl" data-note="Before fork there is one process: this one." data-note-zh="fork 之前只有一個 process：就是這一個。">    printf("parent: I am PID %d\n", getpid());</span>
+
+<span class="hl" data-note="1. fork: the kernel makes a copy of this process, with a new PID. Both copies continue from the next line." data-note-zh="1. fork：核心把這個 process 複製一份，給它一個新的 PID。兩份都從下一行繼續跑。">    pid_t child = fork();</span>
+
+<span class="hl" data-note="fork returns 0 in the copy, so only the child runs this block." data-note-zh="fork 在複製出來的那份裡回傳 0，所以只有子 process 會跑這一段。">    if (child == 0) {
+        printf("child:  I am PID %d, my parent is PID %d\n",
+               getpid(), getppid());</span>
+<span class="hl" data-note="2. exec: replace this process's program with ps. Same process, same PID; nothing after this line runs, unless exec failed." data-note-zh="2. exec：把這個 process 的程式換成 ps。同一個 process、同一個 PID；這行之後的程式碼都不會跑，除非 exec 失敗。">        execlp("ps", "ps", "-o", "pid,ppid,cmd", NULL);</span>
+        perror("exec failed");
+        return 1;
+    }
+
+<span class="hl" data-note="3. wait: the parent sleeps until the child has ended. This is why the prompt only comes back when your program is done." data-note-zh="3. wait：父 process 睡著，直到子 process 結束。這就是為什麼你的程式跑完，提示字元才會回來。">    waitpid(child, NULL, 0);
+    printf("parent: child %d has ended, back to me\n", child);</span></pre>
+<p class="notes-hint" lang="en">Point at a highlighted line to see a note. The whole file is <a href="code/tiny_shell.c"><code>code/tiny_shell.c</code></a>.</p>
+<p class="notes-hint" lang="zh-Hant">把滑鼠移到標起來的那幾行，可以看到說明。完整檔案在 <a href="code/tiny_shell.c"><code>code/tiny_shell.c</code></a>。</p>
+
+<p lang="en">We compiled it and ran it from <code>bash</code>:</p>
+<p lang="zh-Hant">我們把它編譯好，在 <code>bash</code> 裡執行：</p>
+<pre class="term"><span class="ok">$ gcc -o tiny_shell /code/tiny_shell.c &amp;&amp; ./tiny_shell</span>
+<span class="b">parent: I am PID 27</span>
+<span class="a">child:  I am PID 28, my parent is PID 27</span>
+    PID    PPID CMD
+     20      13 bash --norc -i
+     27      20 ./tiny_shell
+     28      27 ps -o pid,ppid,cmd
+<span class="b">parent: child 28 has ended, back to me</span></pre>
+<p lang="en">Follow the numbers. <code>bash</code> (PID 20) started <code>tiny_shell</code> (27). <code>fork</code> made a copy, 28, whose parent is 27. In the copy, <code>exec</code> replaced the program with <code>ps</code>, but the process stayed the same: <code>ps</code> lists itself as PID 28. The parent waited, and printed its last line only after the child had ended.</p>
+<p lang="zh-Hant">跟著數字看。<code>bash</code>（PID 20）啟動了 <code>tiny_shell</code>（27）。<code>fork</code> 複製出一份 28，它的父 process 是 27。在複製出來的那份裡，<code>exec</code> 把程式換成 <code>ps</code>，但 process 還是同一個：<code>ps</code> 列出的自己就是 PID 28。父 process 一直在等，等子 process 結束後才印出最後一行。</p>
+
+<table class="t">
+  <tr><th><span lang="en">Step</span><span lang="zh-Hant">步驟</span></th><th><span lang="en">What it does</span><span lang="zh-Hant">做什麼</span></th><th>PID</th></tr>
+  <tr><td><code>fork</code></td><td><span lang="en">copy this process</span><span lang="zh-Hant">複製這個 process</span></td><td><span lang="en">the copy gets a new PID; its parent is the original</span><span lang="zh-Hant">複製出來的那份拿到新的 PID；它的父 process 是原本那個</span></td></tr>
+  <tr><td><code>exec</code></td><td><span lang="en">run another program in this process</span><span lang="zh-Hant">在這個 process 裡改跑另一個程式</span></td><td><span lang="en">unchanged</span><span lang="zh-Hant">不變</span></td></tr>
+  <tr><td><code>wait</code></td><td><span lang="en">sleep until a child ends</span><span lang="zh-Hant">睡著，直到某個子 process 結束</span></td><td>—</td></tr>
+</table>
+
+<p lang="en"><mark>Every program you start from a terminal is started this way: the shell forks, the copy execs your program, and the shell waits.</mark> <code>ros2 launch</code> does the same once for every program in the launch file, except that it doesn't wait for one before starting the next: they run side by side. So processes form a tree, and <code>ps --forest</code> draws it:</p>
+<p lang="zh-Hant"><mark>你從終端機啟動的每個程式都是這樣啟動的：shell 先 fork，複製出來的那份 exec 你的程式，shell 再等它。</mark><code>ros2 launch</code> 也一樣，對 launch 檔裡的每個程式各做一次，只是它不會等前一個結束才啟動下一個：它們同時在跑。所以 process 會排成一棵樹，<code>ps --forest</code> 會把它畫出來：</p>
+<pre class="term"><span class="ok">$ ps -e -o pid,ppid,cmd --forest</span>
+    PID    PPID CMD
+     20      13  \_ bash --norc -i
+     36      20  |   \_ /usr/bin/python3 .../bin/ros2 launch robot.launch.py
+     37      36  |       \_ python3 /code/fake_mcu.py
+     39      36  |       \_ python3 /code/driver.py
+     41      36  |       \_ python3 /code/monitor.py</pre>
+<p lang="en"><b>PPID</b> is the parent's PID. <code>bash</code> (20) started the launcher (36), and the launcher started all three programs. <mark>The launcher is the parent of every node it starts.</mark> Remember that for Part 4.</p>
+<p lang="zh-Hant"><b>PPID</b> 是父 process 的 PID。<code>bash</code>（20）啟動了 launcher（36），launcher 再啟動了三個程式。<mark>launcher 是它啟動的每個 node 的父 process。</mark>第 4 部分會用到這件事。</p>
+
+<h3><span lang="en">/proc: ask the kernel</span><span lang="zh-Hant">/proc：直接問核心</span></h3>
+<p lang="en">Where did <code>ps</code> get those PIDs and parents? From the <span class="who os">kernel</span>, which keeps a record of every process and shows it as files in <code>/proc</code>: one folder per PID.</p>
+<p lang="zh-Hant"><code>ps</code> 是從哪裡拿到這些 PID 和父 process 的？從<span class="who os">核心</span>。核心幫每個 process 留著紀錄，並把它當成檔案放在 <code>/proc</code> 裡：每個 PID 一個資料夾。</p>
+<pre class="term"><span class="ok">$ ls /proc</span>     <span class="m"># only the numbered folders</span>
+1  7  13  20  36  37  39  41  ...
+<span class="ok">$ grep -E '^(State|PPid|VmRSS|Threads)' /proc/39/status</span>
+State:	S (sleeping)
+PPid:	36
+VmRSS:	   52932 kB
+Threads:	11</pre>
+<p lang="en">The driver (39) is sleeping until its next timer, its parent is the launcher (36), it uses about 52 MB of RAM, and it runs 11 threads. These files are not on the SSD: <mark>the kernel writes them out at the moment you read them.</mark> <code>ps</code> and <code>top</code> do nothing more than read <code>/proc</code>. Part 8 shows more of it.</p>
+<p lang="zh-Hant">driver（39）在睡覺，等下一次 timer；它的父 process 是 launcher（36），用了大約 52 MB 的 RAM，有 11 條執行緒。這些檔案不在 SSD 上：<mark>是你讀的那一刻，核心才把它們寫出來。</mark><code>ps</code> 和 <code>top</code> 做的也只是讀 <code>/proc</code>。第 8 部分有更多。</p>
+
+<h3><span lang="en">A container's processes are ordinary processes</span><span lang="zh-Hant">容器裡的 process 就是一般的 process</span></h3>
+<p lang="en">We ran all of this in a Docker container. A container is not a separate computer: its processes run on the same kernel as everything else, with their own view of the PIDs. On the host, outside the container, the same four processes show up with other numbers:</p>
+<p lang="zh-Hant">這些都是在 Docker 容器裡跑的。容器不是另一台電腦：它的 process 跟其他所有東西跑在同一個核心上，只是看到的 PID 不一樣。在主機上（容器外面），同樣四個 process 會用別的編號出現：</p>
+<pre class="term"><span class="m"># inside the container</span>
+<span class="ok">$ ps -eo pid,user,cmd</span>
+      1 root     /usr/bin/python3 /opt/ros/humble/bin/ros2 launch /code/robot.launch.py
+     21 root     python3 /code/fake_mcu.py
+     23 root     python3 /code/driver.py
+     25 root     python3 /code/monitor.py
+<span class="m"># on the host, at the same moment</span>
+<span class="ok">$ ps -eo pid,user,cmd</span>
+  94385 root     /usr/bin/python3 /opt/ros/humble/bin/ros2 launch /code/robot.launch.py
+  94466 root     python3 /code/fake_mcu.py
+  94468 root     python3 /code/driver.py
+  94470 root     python3 /code/monitor.py</pre>
+<p lang="en">So <code>ps</code>, <code>/proc</code> and <code>kill</code> work on the host too: the host can see and stop every container's processes. The container can only see its own.</p>
+<p lang="zh-Hant">所以 <code>ps</code>、<code>/proc</code> 和 <code>kill</code> 在主機上也能用：主機看得到、也停得掉每個容器的 process。容器只看得到自己的。</p>
+
+<div class="quiz">
+  <button><span lang="en"><b>You run <code>ros2 run</code> on the same node in two terminals.</b> How many processes, and how many PIDs?</span><span lang="zh-Hant"><b>你在兩個終端機對同一個 node 執行 <code>ros2 run</code>。</b>有幾個 process、幾個 PID？</span><span class="ans"><span lang="en">Two processes with two PIDs, from one program file. ROS also sees two nodes with the same name, which causes its own trouble.</span><span lang="zh-Hant">兩個 process、兩個 PID，來自同一個程式檔。ROS 也會看到兩個同名的 node，這會帶來別的麻煩。</span></span></button>
+  <button><span lang="en"><b>Where is a process's PPID stored?</b> Who can change it?</span><span lang="zh-Hant"><b>process 的 PPID 存在哪裡？</b>誰能改它？</span><span class="ans"><span lang="en">In the kernel; you read it in <code>/proc/PID/status</code>. Only the kernel changes it, and it does so in one case: when the parent dies. That is the "1" from Part 1.</span><span lang="zh-Hant">在核心裡；你可以從 <code>/proc/PID/status</code> 讀到。只有核心會改它，而且只有一種情況：父 process 死掉的時候。那就是第 1 部分的「1」。</span></span></button>
+  <button><span lang="en"><b>You edit <code>driver.py</code> while the driver is running.</b> Does the running node change?</span><span lang="zh-Hant"><b>driver 在跑的時候，你改了 <code>driver.py</code>。</b>正在跑的 node 會變嗎？</span><span class="ans"><span lang="en">No. The process runs the copy already loaded into its RAM. The change takes effect the next time the program is started: a new process.</span><span lang="zh-Hant">不會。process 跑的是已經載入 RAM 的那一份。修改要等下次啟動程式（一個新的 process）才會生效。</span></span></button>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="signals"><small><span lang="en">Part 4</span><span lang="zh-Hant">第 4 部分</span></small><span lang="en">Stopping a process: signals</span><span lang="zh-Hant">停止 process：signal</span></h2>
+
+<p lang="en">Nothing outside a process can reach into it and stop it. Instead, the <span class="who os">kernel</span> delivers it a <b>signal</b>: a short notice with a number and a name. <code>kill</code> is the command that asks the kernel to send one; despite its name, it only sends a notice. These are the signals you will meet:</p>
+<p lang="zh-Hant">process 外面的東西沒辦法伸手進去把它停掉。取而代之的是，<span class="who os">核心</span>送給它一個 <b>signal</b>：一個帶編號和名字的簡短通知。<code>kill</code> 就是請核心送 signal 的指令；雖然叫 kill，它只是送一個通知。你會遇到的 signal 有這些：</p>
+
+<table class="t">
+  <tr><th>Signal</th><th><span lang="en">What sends it</span><span lang="zh-Hant">誰會送它</span></th><th><span lang="en">Default action</span><span lang="zh-Hant">預設動作</span></th><th><span lang="en">Can a process catch it?</span><span lang="zh-Hant">process 能接住嗎？</span></th></tr>
+  <tr><td><code>SIGINT</code> (2)</td><td><span lang="en">Ctrl+C in a terminal</span><span lang="zh-Hant">在終端機按 Ctrl+C</span></td><td><span lang="en">end the process</span><span lang="zh-Hant">結束 process</span></td><td><span lang="en">yes</span><span lang="zh-Hant">可以</span></td></tr>
+  <tr><td><code>SIGTERM</code> (15)</td><td><span lang="en"><code>kill PID</code>; <code>docker stop</code>; a system shutting down</span><span lang="zh-Hant"><code>kill PID</code>；<code>docker stop</code>；系統關機</span></td><td><span lang="en">end the process</span><span lang="zh-Hant">結束 process</span></td><td><span lang="en">yes</span><span lang="zh-Hant">可以</span></td></tr>
+  <tr><td><code>SIGHUP</code> (1)</td><td><span lang="en">the terminal closes (an SSH session drops)</span><span lang="zh-Hant">終端機關掉（SSH 斷線）</span></td><td><span lang="en">end the process</span><span lang="zh-Hant">結束 process</span></td><td><span lang="en">yes</span><span lang="zh-Hant">可以</span></td></tr>
+  <tr><td><code>SIGKILL</code> (9)</td><td><code>kill -9 PID</code></td><td><span lang="en">end the process</span><span lang="zh-Hant">結束 process</span></td><td><span lang="en"><b>no</b>: the kernel ends it at once</span><span lang="zh-Hant"><b>不行</b>：核心直接結束它</span></td></tr>
+</table>
+
+<p lang="en">Every one of them ends the process by default. But a process can <b>catch</b> a signal: tell the kernel "when this one arrives, run my function instead". A node catches SIGINT to shut down cleanly. A launcher should catch it to stop its children first. Only SIGKILL can't be caught: the process never gets to run any code. <mark>Whether a signal is caught decides whether the process gets to clean up.</mark></p>
+<p lang="zh-Hant">它們的預設動作都是結束 process。但 process 可以<b>接住</b>（catch）signal：告訴核心「這個 signal 到的時候，改跑我的函式」。node 接住 SIGINT 是為了好好地結束；launcher 應該接住它，先把子 process 停掉。只有 SIGKILL 接不住：process 連一行程式都沒機會跑。<mark>signal 有沒有被接住，決定了 process 有沒有機會收拾善後。</mark></p>
+
+<p lang="en">The kernel keeps, for every process, the list of signals it catches, and <code>/proc</code> shows it as a bit mask (<code>SigCgt</code>, in hexadecimal: bit <i>n</i>−1 stands for signal <i>n</i>). Compare the launcher with the driver:</p>
+<p lang="zh-Hant">核心幫每個 process 記著它接住哪些 signal，<code>/proc</code> 會用位元遮罩顯示（<code>SigCgt</code>，十六進位：第 <i>n</i>−1 個位元代表 signal <i>n</i>）。比較 launcher 和 driver：</p>
+<pre class="term"><span class="ok">$ grep SigCgt /proc/&lt;launcher&gt;/status</span>
+SigCgt:	0000000100000002      <span class="m">0x2: signal 2 → SIGINT only</span>
+<span class="ok">$ grep SigCgt /proc/&lt;driver&gt;/status</span>
+SigCgt:	0000000100004002      <span class="m">0x4002: signals 2 and 15 → SIGINT and SIGTERM</span></pre>
+<p lang="en">(The leading 1 is signal 33, used inside the C library; ignore it.) In ROS 2 Humble, <code>ros2 launch</code> catches SIGINT and nothing else. Now step through what <code>kill</code> did, and compare it with Ctrl+C:</p>
+<p lang="zh-Hant">（開頭的 1 是 signal 33，C 函式庫內部用的，不用管。）在 ROS 2 Humble，<code>ros2 launch</code> 只接 SIGINT，其他都不接。現在一步一步看 <code>kill</code> 做了什麼，再跟 Ctrl+C 比較：</p>
+
+<div class="callout walk">
+  <div class="glyph">W1</div>
+  <div>
+    <span lang="en"><b>Walkthrough 1: Two ways to stop a launch.</b> Watch the process tree while T2 runs <code>kill</code> on the launcher, then replay with Ctrl+C in T1. Every PID and log line is from a real run.</span>
+    <span lang="zh-Hant"><b>逐步解說 1：停止 launch 的兩種方法。</b>看著 process 樹：先在 T2 對 launcher 下 <code>kill</code>，再重來一次，改成在 T1 按 Ctrl+C。每個 PID 和每行 log 都來自真的執行結果。</span>
+    <br><a class="btn" href="walk/stop-launch.html"><span lang="en">Open walkthrough 1 ▶</span><span lang="zh-Hant">開啟逐步解說 1 ▶</span></a> <span class="muted"><span lang="en">11 steps · ← → or a clicker · E for the explanation · L for 中文</span><span lang="zh-Hant">11 步 · ← → 或簡報筆 · E 看說明 · L 切換語言</span></span></div>
+</div>
+
+<p lang="en">So the answer to Part 1: <code>kill 471</code> sent SIGTERM to the launcher alone. The launcher doesn't catch SIGTERM, so it ended at once, without telling its children. <mark>A process whose parent dies is an <b>orphan</b>, and the kernel gives it a new parent, PID 1, instead of stopping it.</mark> PID 1 is the first process of the system (or of the container), and it adopts every orphan. The nodes never received any signal, so they kept running.</p>
+<p lang="zh-Hant">所以第 1 部分的答案是：<code>kill 471</code> 只把 SIGTERM 送給 launcher。launcher 沒接 SIGTERM，所以立刻結束，沒有通知它的子 process。<mark>父 process 死掉的 process 叫做<b>孤兒</b>（orphan），核心不會停掉它，而是給它一個新的父 process：PID 1。</mark>PID 1 是系統（或容器）的第一個 process，所有孤兒都由它收養。node 從頭到尾沒收到任何 signal，所以繼續跑。</p>
+
+<p lang="en">Ctrl+C works because of <b>process groups</b>. The shell puts a command and everything it starts into one group, and makes it the terminal's <b>foreground group</b>. Ctrl+C sends SIGINT to every process in that group at once, so each node gets the signal itself, and each one catches it.</p>
+<p lang="zh-Hant">Ctrl+C 有用，是因為 <b>process group</b>。shell 會把一個指令以及它啟動的所有東西放進同一個 group，並設成終端機的<b>前景 group</b>。Ctrl+C 會同時把 SIGINT 送給這個 group 裡的每個 process，所以每個 node 都親自收到 signal，而且每個都接住了。</p>
+
+<h3><span lang="en">When a process doesn't stop</span><span lang="zh-Hant">process 不肯停的時候</span></h3>
+<p lang="en">A good launcher doesn't wait forever. Here is a node, <code>stubborn.py</code>, that ignores SIGINT, and what <code>ros2 launch</code> does after Ctrl+C (seconds since Ctrl+C on the left):</p>
+<p lang="zh-Hant">好的 launcher 不會永遠等下去。這是一個忽略 SIGINT 的 node：<code>stubborn.py</code>，以及按下 Ctrl+C 之後 <code>ros2 launch</code> 做了什麼（左邊是按下 Ctrl+C 後的秒數）：</p>
+<pre class="term"><span class="m"> 0.0</span>  ^C[WARNING] [launch]: user interrupted with ctrl-c (SIGINT)
+<span class="m"> 5.0</span>  <span class="b">[ERROR] [python3-1]: process[python3-1] failed to terminate '5' seconds after receiving 'SIGINT', escalating to 'SIGTERM'</span>
+<span class="m"> 5.0</span>  [INFO] [python3-1]: sending signal 'SIGTERM' to process[python3-1]
+<span class="m">10.0</span>  <span class="b">[ERROR] [python3-1]: process[python3-1] failed to terminate '10.0' seconds after receiving 'SIGTERM', escalating to 'SIGKILL'</span>
+<span class="m">10.0</span>  [INFO] [python3-1]: sending signal 'SIGKILL' to process[python3-1]
+<span class="m">10.0</span>  [ERROR] [python3-1]: process has died [pid 445, exit code -9, cmd 'python3 /code/stubborn.py'].</pre>
+<p lang="en">Ask politely, then firmly, then end it: SIGINT, SIGTERM after 5 s, SIGKILL after 5 s more. <mark>SIGKILL is the last resort, not the first.</mark> A process killed with SIGKILL can't close files, release a device or tell anyone it left, and Part 5 shows what that leaves behind. The exit code tells you how it ended: −9 means "ended by signal 9".</p>
+<p lang="zh-Hant">先客氣地問，再強硬地要求，最後直接結束：SIGINT，5 秒後 SIGTERM，再 5 秒後 SIGKILL。<mark>SIGKILL 是最後手段，不是第一個選擇。</mark>被 SIGKILL 結束的 process 沒辦法關檔案、釋放裝置，也沒辦法通知別人它離開了；第 5 部分會看到這會留下什麼。exit code 告訴你它怎麼結束的：−9 代表「被 signal 9 結束」。</p>
+
+<div class="quiz">
+  <button><span lang="en"><b>In Part 1, would <code>kill -9 471</code> have been better?</b></span><span lang="zh-Hant"><b>第 1 部分如果用 <code>kill -9 471</code>，會比較好嗎？</b></span><span class="ans"><span lang="en">No, the same: SIGKILL also goes to the launcher alone, which can't even try to clean up. We tried it: the three nodes kept running with PPID 1.</span><span lang="zh-Hant">不會，結果一樣：SIGKILL 一樣只送給 launcher，它連收拾的機會都沒有。我們試過了：三個 node 繼續跑，PPID 是 1。</span></span></button>
+  <button><span lang="en"><b>The nodes are already orphans.</b> How do you stop them?</span><span lang="zh-Hant"><b>node 已經變成孤兒了。</b>要怎麼停掉它們？</span><span class="ans"><span lang="en">Send the signal to them directly: <code>kill 472 474 476</code>, or by name, <code>pkill -f /code/</code>. Check with <code>ps</code> afterwards. Careful: <code>pkill -f</code> matches anywhere in the command line, including your own shell's.</span><span lang="zh-Hant">直接送 signal 給它們：<code>kill 472 474 476</code>，或依名稱 <code>pkill -f /code/</code>。之後用 <code>ps</code> 確認。小心：<code>pkill -f</code> 會比對整個指令列的任何地方，連你自己的 shell 都可能被比對到。</span></span></button>
+  <button><span lang="en"><b>From T2, you send <code>kill -INT</code> to the launcher.</b> It's SIGINT, the signal it catches. What happens?</span><span lang="zh-Hant"><b>你在 T2 對 launcher 送 <code>kill -INT</code>。</b>那是 SIGINT，它會接住的 signal。會發生什麼事？</span><span class="ans"><span lang="en">The launcher catches it, but assumes the SIGINT came from Ctrl+C and so already reached its children. It waits 5 s for them to stop, then escalates to SIGTERM. Everything does stop, 5 s late. We saw exactly this.</span><span lang="zh-Hant">launcher 接住了，但它以為 SIGINT 來自 Ctrl+C，所以子 process 應該也收到了。它等 5 秒讓它們停，然後升級成 SIGTERM。最後全部都停了，只是晚了 5 秒。我們實際看到的就是這樣。</span></span></button>
+</div>
+
+<div class="case robot">
+  <div class="case-h"><span lang="en">On a robot</span><span lang="zh-Hant">在機器人上</span></div>
+  <div class="case-t"><span lang="en">Why does <code>docker stop</code> take 10 seconds?</span><span lang="zh-Hant">為什麼 <code>docker stop</code> 要 10 秒？</span></div>
+  <p lang="en">On a robot, the stack often runs as the main command of a container, so the launcher is the container's PID 1. <code>docker stop</code> sends SIGTERM, waits 10 s, then sends SIGKILL. PID 1 is special: <mark>the kernel never applies a default action to PID 1</mark>, so a signal it doesn't catch is simply dropped. Our launcher doesn't catch SIGTERM, so nothing happens for 10 s, and then everything is SIGKILLed with no chance to clean up:</p>
+  <p lang="zh-Hant">在機器人上，整個系統常常是容器的主要指令，所以 launcher 就是容器的 PID 1。<code>docker stop</code> 會送 SIGTERM，等 10 秒，再送 SIGKILL。PID 1 很特別：<mark>核心從不對 PID 1 執行預設動作</mark>，所以它沒接的 signal 會直接被丟掉。我們的 launcher 不接 SIGTERM，所以 10 秒內什麼都沒發生，然後全部被 SIGKILL，完全沒機會收拾：</p>
+<pre class="term"><span class="ok">$ time docker stop os1b</span>
+real	0m10.219s
+<span class="ok">$ time docker stop -s SIGINT os1b</span>      <span class="m"># the signal the launcher catches</span>
+real	0m0.248s</pre>
+  <p lang="en">With SIGINT, the launcher stopped every node cleanly in a quarter of a second. You can make that the default with <code>STOPSIGNAL SIGINT</code> in a Dockerfile or <code>stop_signal: SIGINT</code> in a compose file. A short <code>stop_grace_period</code> only makes the SIGKILL come sooner; it doesn't make the stop clean.</p>
+  <p lang="zh-Hant">改用 SIGINT 後，launcher 在 0.25 秒內把每個 node 都好好停掉了。你可以把它設成預設：Dockerfile 裡寫 <code>STOPSIGNAL SIGINT</code>，或 compose 檔裡寫 <code>stop_signal: SIGINT</code>。把 <code>stop_grace_period</code> 設短只會讓 SIGKILL 早點來，並不會讓停止變乾淨。</p>
+</div>
+
+<div class="try">
+  <div class="try-h"><span lang="en">Try it</span><span lang="zh-Hant">動手試</span></div>
+  <div class="try-t"><span lang="en">Make orphans, then stop a launch properly</span><span lang="zh-Hant">製造孤兒，再好好地停掉 launch</span></div>
+  <p lang="en">You need the club's Humble image once (see <code>ros2-basics/verify/README.md</code> to build <code>dit-ros2-tutorial:humble</code>). From this worksheet's folder, start T1:</p>
+  <p lang="zh-Hant">需要先建好社團的 Humble image（照 <code>ros2-basics/verify/README.md</code> 建立 <code>dit-ros2-tutorial:humble</code>，只要做一次）。在這份學習單的資料夾裡開 T1：</p>
+<pre data-lang="sh">docker run -it --rm --name os1 -v "$PWD/code":/code dit-ros2-tutorial:humble bash
+cd /code &amp;&amp; ros2 launch robot.launch.py</pre>
+  <p lang="en">Open T2 with <code>docker exec -it os1 bash</code>. Before each step, say what you expect.</p>
+  <p lang="zh-Hant">用 <code>docker exec -it os1 bash</code> 開 T2。每一步之前，先說出你預期會怎樣。</p>
+  <ol>
+    <li><span lang="en">In T2: <code>ps -e -o pid,ppid,cmd --forest</code>. Find the launcher's PID, then <code>grep SigCgt /proc/PID/status</code>.</span><span lang="zh-Hant">在 T2：<code>ps -e -o pid,ppid,cmd --forest</code>。找到 launcher 的 PID，再 <code>grep SigCgt /proc/PID/status</code>。</span></li>
+    <li><span lang="en"><code>kill</code> the launcher. Run <code>ros2 node list</code> and <code>ps</code> again. Who is the parent now?</span><span lang="zh-Hant"><code>kill</code> launcher。再跑一次 <code>ros2 node list</code> 和 <code>ps</code>。現在誰是父 process？</span></li>
+    <li><span lang="en">Stop the orphans by PID. Start the launch again in T1 and stop it with Ctrl+C. Read the exit codes in the log.</span><span lang="zh-Hant">用 PID 停掉孤兒。在 T1 重新啟動 launch，用 Ctrl+C 停掉。讀 log 裡的 exit code。</span></li>
+    <li><span lang="en">Run <code>ros2 launch stubborn.launch.py</code> and press Ctrl+C. Count the seconds until the prompt comes back.</span><span lang="zh-Hant">跑 <code>ros2 launch stubborn.launch.py</code>，按 Ctrl+C。數一數過幾秒才回到提示字元。</span></li>
+  </ol>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="daemons"><small><span lang="en">Part 5</span><span lang="zh-Hant">第 5 部分</span></small><span lang="en">Daemons: processes with no terminal</span><span lang="zh-Hant">daemon：沒有終端機的 process</span></h2>
+
+<h3><span lang="en">When the SSH session drops</span><span lang="zh-Hant">SSH 斷線的時候</span></h3>
+<p lang="en">On a robot you usually work over SSH: your terminal is on your laptop, and the shell runs on the robot. When the connection drops, from bad Wi‑Fi or a closed laptop lid, the robot's side of the terminal disappears. The kernel then sends <b>SIGHUP</b> ("hang up") to the terminal's foreground process group: the launcher and every node in it. We did exactly that to a terminal running our launch. Five seconds later:</p>
+<p lang="zh-Hant">在機器人上，你通常透過 SSH 工作：終端機在你的筆電上，shell 在機器人上跑。連線一斷（Wi‑Fi 不好、筆電蓋上），機器人那一端的終端機就消失了。這時核心會送 <b>SIGHUP</b>（hang up，掛斷）給這個終端機的前景 process group：launcher 和裡面的每個 node。我們真的對一個正在跑 launch 的終端機這樣做。5 秒後：</p>
+<pre class="term"><span class="ok">$ ps -e -o pid,ppid,cmd | grep -e 'ros2 launch' -e 'python3 /code'</span>
+<span class="m">(nothing)</span></pre>
+<p lang="en">No orphans this time: every process got the signal, and the default action for SIGHUP is to end. That is clean, but it is rarely what you want. <mark>A test run, a long recording or a match strategy you started over SSH dies with your Wi‑Fi.</mark> To survive, a process must not belong to your terminal at all.</p>
+<p lang="zh-Hant">這次沒有孤兒：每個 process 都收到了 signal，而 SIGHUP 的預設動作就是結束。乾淨是乾淨，但很少是你要的。<mark>透過 SSH 啟動的測試、長時間的錄製，或比賽策略，都會跟著你的 Wi‑Fi 一起死掉。</mark>要活下來，process 就不能屬於你的終端機。</p>
+
+<h3><span lang="en">A daemon has no terminal</span><span lang="zh-Hant">daemon 沒有終端機</span></h3>
+<p lang="en">A <b>daemon</b> is a process that runs in the background, with no terminal, until something stops it. You can spot one in <code>ps</code> by asking for the <code>tty</code> column, the terminal each process belongs to: a daemon's is <code>?</code>, and its parent is usually 1. Here is one from the same container:</p>
+<p lang="zh-Hant"><b>daemon</b> 是在背景跑、沒有終端機、直到有東西停掉它才結束的 process。在 <code>ps</code> 裡加上 <code>tty</code> 欄（每個 process 所屬的終端機）就很好認：daemon 的是 <code>?</code>，父 process 通常是 1。這是同一個容器裡的一個：</p>
+<pre class="term"><span class="ok">$ ps -e -o pid,ppid,tty,cmd</span>     <span class="m"># one line of it</span>
+    PID    PPID TT       CMD
+     86       1 ?        /usr/bin/python3 -c from ros2cli.daemon.daemonize import main; main() --name ros2-daemon ...</pre>
+<p lang="en">That is the <b>ROS 2 daemon</b>, started the first time you ran a <code>ros2</code> command. You will meet a few daemons:</p>
+<p lang="zh-Hant">那是 <b>ROS 2 daemon</b>，在你第一次執行 <code>ros2</code> 指令時就啟動了。你會遇到幾個 daemon：</p>
+<table class="t">
+  <tr><th>Daemon</th><th><span lang="en">What it does</span><span lang="zh-Hant">做什麼</span></th><th><span lang="en">How to look at it</span><span lang="zh-Hant">怎麼查看它</span></th></tr>
+  <tr><td><span lang="en">tmux server</span><span lang="zh-Hant">tmux server</span></td><td><span lang="en">holds terminals that survive when you disconnect</span><span lang="zh-Hant">保管斷線後還活著的終端機</span></td><td><code>tmux ls</code></td></tr>
+  <tr><td><span lang="en">ROS 2 daemon</span><span lang="zh-Hant">ROS 2 daemon</span></td><td><span lang="en">remembers which nodes and topics exist, so <code>ros2</code> commands answer fast</span><span lang="zh-Hant">記住有哪些 node 和 topic，讓 <code>ros2</code> 指令回答得快</span></td><td><code>ros2 daemon status</code></td></tr>
+  <tr><td><span lang="en">Docker daemon (<code>dockerd</code>)</span><span lang="zh-Hant">Docker daemon（<code>dockerd</code>）</span></td><td><span lang="en">creates and runs containers; the <code>docker</code> command only sends it requests</span><span lang="zh-Hant">建立並執行容器；<code>docker</code> 指令只是送請求給它</span></td><td><code>systemctl status docker</code></td></tr>
+</table>
+
+<h3><span lang="en">tmux: a terminal that belongs to a daemon</span><span lang="zh-Hant">tmux：屬於 daemon 的終端機</span></h3>
+<p lang="en"><b>tmux</b> splits into two processes: a client that draws on your screen, and a server, a daemon, that owns the terminals your programs run in. Here we started the launch inside tmux, then dropped the connection the same way as above:</p>
+<p lang="zh-Hant"><b>tmux</b> 分成兩個 process：在你螢幕上畫東西的 client，以及 server：一個 daemon，擁有你的程式在裡面跑的終端機。這裡我們在 tmux 裡啟動 launch，然後用跟上面一樣的方式切斷連線：</p>
+<pre class="term"><span class="m"># before</span>
+    PID    PPID TT       CMD
+    349     343 pts/0     \_ bash --norc -i
+    350     349 pts/0     |   \_ tmux new -s robot
+    352       1 ?        tmux new -s robot
+    353     352 pts/1     \_ -bash
+    381     353 pts/1         \_ /usr/bin/python3 /opt/ros/humble/bin/ros2 launch robot.launch.py
+    382     381 pts/1             \_ python3 /code/fake_mcu.py
+    384     381 pts/1             \_ python3 /code/driver.py
+    386     381 pts/1             \_ python3 /code/monitor.py
+<span class="m"># after the connection dropped</span>
+    352       1 ?        tmux new -s robot
+    353     352 pts/1     \_ -bash
+    381     353 pts/1         \_ /usr/bin/python3 /opt/ros/humble/bin/ros2 launch robot.launch.py
+    382     381 pts/1             \_ python3 /code/fake_mcu.py
+    384     381 pts/1             \_ python3 /code/driver.py
+    386     381 pts/1             \_ python3 /code/monitor.py
+<span class="ok">$ tmux ls</span>
+robot: 1 windows (created Fri Nov 20 09:36:01 2026)</pre>
+<p lang="en">There are two <code>tmux</code> processes. 350, on <code>pts/0</code> (your terminal), is the client. 352, with no terminal and parent 1, is the server: a daemon. After the drop, only the client died with <code>pts/0</code>. The launch runs on <code>pts/1</code>, a terminal owned by the tmux server, and that one never hung up. <mark>tmux works because your programs' terminal belongs to a daemon, not to your SSH session.</mark> Log in again and <code>tmux attach -t robot</code> to get it back on your screen.</p>
+<p lang="zh-Hant">有兩個 <code>tmux</code> process。350 在 <code>pts/0</code>（你的終端機）上，是 client。352 沒有終端機、父 process 是 1，是 server：一個 daemon。斷線後，只有 client 跟著 <code>pts/0</code> 一起死了。launch 跑在 <code>pts/1</code> 上，那是 tmux server 擁有的終端機，它從來沒有被掛斷。<mark>tmux 有用，是因為你的程式所在的終端機屬於一個 daemon，而不是你的 SSH 連線。</mark>重新登入後 <code>tmux attach -t robot</code>，就能把它叫回螢幕上。</p>
+<p lang="en">tmux can also be scripted, which is how many teams start a whole robot with one command: a session with one window per program, each one still there to look at later.</p>
+<p lang="zh-Hant">tmux 也可以寫成腳本，很多隊伍就是這樣用一個指令啟動整台機器人：一個 session、每個程式一個視窗，之後每個都還能回去看。</p>
+<pre data-lang="sh"># -d: start it detached, with no client
+tmux new-session -d -s robot "ros2 launch robot.launch.py"
+tmux ls                  # robot: 1 windows ...
+# look at it; Ctrl+B then D leaves it running
+tmux attach -t robot</pre>
+
+<h3><span lang="en">The ROS 2 daemon remembers</span><span lang="zh-Hant">ROS 2 daemon 會記住</span></h3>
+<p lang="en">Daemons keep state, and state can be out of date. Back to the orphans from Part 1: we stopped them with <code>kill -9</code>, which ends a process before it can tell anyone it left. Then:</p>
+<p lang="zh-Hant">daemon 會保存狀態，而狀態可能過時。回到第 1 部分的孤兒：我們用 <code>kill -9</code> 停掉它們，這會讓 process 在通知任何人之前就結束。接著：</p>
+<pre class="term"><span class="ok">$ ps -e -o pid,cmd | grep "python3 /code"</span>
+<span class="m">(nothing)</span>
+<span class="ok">$ ros2 node list</span>
+<span class="b">/driver</span>
+<span class="b">/monitor</span>
+<span class="ok">$ ros2 node list --no-daemon</span>
+<span class="m">(nothing)</span>
+<span class="m"># 20 s later</span>
+<span class="ok">$ ros2 node list</span>
+<span class="m">(nothing)</span></pre>
+<p lang="en"><code>ros2 node list</code> asks the daemon, and the daemon still remembers two nodes that no longer exist. With <code>--no-daemon</code>, the command looks at the network itself and finds nothing. The daemon forgets a node when it hears it leave, or, if the node died without a word, after a timeout: about 20 s here. <mark>When <code>ros2 node list</code> disagrees with <code>ps</code>, believe <code>ps</code>.</mark> To reset the daemon: <code>ros2 daemon stop</code>; the next <code>ros2</code> command starts a fresh one.</p>
+<p lang="zh-Hant"><code>ros2 node list</code> 是去問 daemon，而 daemon 還記得兩個已經不存在的 node。加上 <code>--no-daemon</code>，指令會自己去網路上看，結果什麼都沒有。daemon 聽到 node 離開時就會忘掉它；如果 node 一聲不吭就死了，就要等逾時，這裡大約 20 秒。<mark>當 <code>ros2 node list</code> 跟 <code>ps</code> 說的不一樣時，相信 <code>ps</code>。</mark>要重設 daemon：<code>ros2 daemon stop</code>，下一個 <code>ros2</code> 指令會啟動一個新的。</p>
+
+<h3><span lang="en">Containers are started by a daemon too</span><span lang="zh-Hant">容器也是由 daemon 啟動的</span></h3>
+<p lang="en">When you run <code>docker run</code>, your shell doesn't start the container. The <code>docker</code> command sends a request to the Docker daemon, which starts it. On the host, the container's first process has this parent:</p>
+<p lang="zh-Hant">你執行 <code>docker run</code> 時，啟動容器的不是你的 shell。<code>docker</code> 指令送一個請求給 Docker daemon，由它來啟動。在主機上，容器的第一個 process 的父 process 是：</p>
+<pre class="term">    PID    PPID CMD
+  95583   95558 sleep infinity
+  95558       1 /usr/bin/containerd-shim-runc-v2 ...</pre>
+<p lang="en">95583 is the container's PID 1 (here it was <code>sleep infinity</code>), and its parent is <code>containerd-shim</code>, a helper of the Docker daemon, not your shell.</p>
+<p lang="zh-Hant">95583 是容器的 PID 1（這裡是 <code>sleep infinity</code>），它的父 process 是 <code>containerd-shim</code>：Docker daemon 的幫手，不是你的 shell。</p>
+<p lang="en">So a container started with <code>docker run -d</code> doesn't belong to your terminal and survives a dropped SSH session, like a tmux session does. The same goes for a command you start with <code>docker exec -it</code>: its terminal is held by the Docker daemon, not by your SSH session. We closed the terminal of a <code>docker exec -it</code> client, and the command inside the container kept running. That sounds convenient, but <mark>it is a launch you can no longer see or Ctrl+C</mark>, and the next one you start will clash with it. Find it with <code>ps</code> inside the container and stop it, or start it in tmux in the first place, so you can get back to it.</p>
+<p lang="zh-Hant">所以用 <code>docker run -d</code> 啟動的容器不屬於你的終端機，SSH 斷線後還會活著，就跟 tmux session 一樣。用 <code>docker exec -it</code> 啟動的指令也一樣：它的終端機由 Docker daemon 保管，不屬於你的 SSH 連線。我們關掉一個 <code>docker exec -it</code> client 的終端機，容器裡的指令繼續在跑。聽起來很方便，但<mark>那是一個你再也看不到、也沒辦法按 Ctrl+C 的 launch</mark>，你下一次啟動的 launch 會跟它撞在一起。在容器裡用 <code>ps</code> 找到它並停掉，或一開始就在 tmux 裡啟動，這樣才回得去。</p>
+
+<div class="case robot">
+  <div class="case-h"><span lang="en">On a robot</span><span lang="zh-Hant">在機器人上</span></div>
+  <div class="case-t"><span lang="en">The process that owns the serial port</span><span lang="zh-Hant">佔著序列埠的 process</span></div>
+  <p lang="en">Robots often run a long-lived bridge between the robot computer and a microcontroller, such as the micro-ROS agent: one process that opens the serial device and keeps it open. If a second copy starts (a leftover orphan, or a launch started twice), two processes read the same port and each gets half the bytes: garbled messages, or a microcontroller that seems to disconnect at random. To see who has a device open, <code>fuser -v</code> lists every process using it:</p>
+  <p lang="zh-Hant">機器人上常常有一個長時間執行的橋接程式，連接機器人電腦和微控制器，例如 micro-ROS agent：一個打開序列裝置、一直開著的 process。如果又啟動了第二份（留下來的孤兒，或 launch 啟動了兩次），兩個 process 讀同一個序列埠，各拿到一半的位元組：訊息亂掉，或微控制器看起來隨機斷線。要看是誰開著某個裝置，<code>fuser -v</code> 會列出所有在用它的 process：</p>
+<pre class="term"><span class="ok">$ fuser -v /dev/pts/1</span>
+                     USER        PID ACCESS COMMAND
+/dev/pts/1:          root        491 F.... python3
+                     root        493 f.... python3</pre>
+  <p lang="en">Here that is <code>fake_mcu</code> (491, which created the port) and <code>driver</code> (493), as expected. A third line would be your problem.</p>
+  <p lang="zh-Hant">這裡是 <code>fake_mcu</code>（491，建立這個序列埠的）和 <code>driver</code>（493），符合預期。如果出現第三行，那就是你的問題。</p>
+</div>
+
+<div class="try">
+  <div class="try-h"><span lang="en">Try it</span><span lang="zh-Hant">動手試</span></div>
+  <div class="try-t"><span lang="en">Survive a dropped connection; catch a stale daemon</span><span lang="zh-Hant">撐過斷線；抓到過時的 daemon</span></div>
+  <p lang="en">The image has no tmux yet. In T1, install it once: <code>apt-get update &amp;&amp; apt-get install -y tmux psmisc</code> (<code>psmisc</code> gives <code>fuser</code> and <code>pstree</code>).</p>
+  <p lang="zh-Hant">image 裡還沒有 tmux。在 T1 裝一次：<code>apt-get update &amp;&amp; apt-get install -y tmux psmisc</code>（<code>psmisc</code> 提供 <code>fuser</code> 和 <code>pstree</code>）。</p>
+  <ol>
+    <li><span lang="en">In T2: <code>tmux new -s robot</code>, then <code>cd /code &amp;&amp; ros2 launch robot.launch.py</code> inside it. Close the T2 window entirely. In T1: <code>tmux ls</code> and <code>ps -e -o pid,ppid,tty,cmd --forest</code>. Then <code>tmux attach -t robot</code>.</span><span lang="zh-Hant">在 T2：<code>tmux new -s robot</code>，在裡面執行 <code>cd /code &amp;&amp; ros2 launch robot.launch.py</code>。把 T2 整個視窗關掉。在 T1：<code>tmux ls</code> 和 <code>ps -e -o pid,ppid,tty,cmd --forest</code>。然後 <code>tmux attach -t robot</code>。</span></li>
+    <li><span lang="en">With the launch running, <code>fuser -v $(readlink /tmp/mcu)</code>. Which PIDs, and which programs are they?</span><span lang="zh-Hant">launch 還在跑時，執行 <code>fuser -v $(readlink /tmp/mcu)</code>。有哪些 PID？它們是哪些程式？</span></li>
+    <li><span lang="en">From outside tmux, <code>pkill -9 -f '^python3 /code/'</code>, then at once <code>ros2 node list</code> and <code>ros2 node list --no-daemon</code>. Repeat <code>ros2 node list</code> every few seconds until the nodes disappear.</span><span lang="zh-Hant">在 tmux 外面執行 <code>pkill -9 -f '^python3 /code/'</code>，馬上接著 <code>ros2 node list</code> 和 <code>ros2 node list --no-daemon</code>。每隔幾秒重跑一次 <code>ros2 node list</code>，直到 node 消失。</span></li>
+  </ol>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="perms"><small><span lang="en">Part 6</span><span lang="zh-Hant">第 6 部分</span></small><span lang="en">Who may touch this file</span><span lang="zh-Hant">誰可以碰這個檔案</span></h2>
+
+<p lang="en">Every process runs as a <b>user</b>, and every file belongs to one user and one group. Before a process opens a file, the <span class="who os">kernel</span> compares the two. <code>id</code> shows who you are:</p>
+<p lang="zh-Hant">每個 process 都以某個<b>使用者</b>的身分執行，每個檔案都屬於一個使用者和一個群組。process 要開檔案之前，<span class="who os">核心</span>會比對這兩者。<code>id</code> 告訴你你是誰：</p>
+<pre class="term"><span class="ok">$ id</span>
+uid=1000(member) gid=1000(member) groups=1000(member)</pre>
+<p lang="en"><code>uid</code> is your user number, and <code>groups</code> lists every group you are in. User 0 is <b>root</b>, who passes every check. In our container, every process ran as root (<code>Uid: 0</code> in <code>/proc</code>), which is why nothing has been refused so far.</p>
+<p lang="zh-Hant"><code>uid</code> 是你的使用者編號，<code>groups</code> 列出你所在的每個群組。使用者 0 是 <b>root</b>，所有檢查都會通過。在我們的容器裡，每個 process 都以 root 執行（<code>/proc</code> 裡的 <code>Uid: 0</code>），所以到目前為止都沒有被拒絕過。</p>
+
+<h3><span lang="en">Reading <code>ls -l</code></span><span lang="zh-Hant">讀懂 <code>ls -l</code></span></h3>
+<p lang="en">A device is a file too. Our serial port has a friendly name, <code>/tmp/mcu</code>, that points to the real device:</p>
+<p lang="zh-Hant">裝置也是檔案。我們的序列埠有一個好記的名字 <code>/tmp/mcu</code>，它指向真正的裝置：</p>
+<pre class="term"><span class="ok">$ ls -l /tmp/mcu /dev/pts/0</span>
+lrwxrwxrwx 1 root root 10 Nov 20 09:28 /tmp/mcu -> /dev/pts/0
+crw--w---- 1 root tty 136, 0 Nov 20 09:28 /dev/pts/0</pre>
+<figure>
+<table class="t">
+  <tr><td><b><code>c</code></b></td><td><b><code>rw-</code></b></td><td><b><code>-w-</code></b></td><td><b><code>---</code></b></td><td><b><code>root</code></b></td><td><b><code>tty</code></b></td></tr>
+  <tr><td><span lang="en">type: <code>c</code> a device, <code>l</code> a link, <code>d</code> a folder, <code>-</code> a file</span><span lang="zh-Hant">類型：<code>c</code> 裝置、<code>l</code> 連結、<code>d</code> 資料夾、<code>-</code> 檔案</span></td><td><span lang="en">what the owner may do</span><span lang="zh-Hant">擁有者可以做的事</span></td><td><span lang="en">what the group may do</span><span lang="zh-Hant">群組可以做的事</span></td><td><span lang="en">what everyone else may do</span><span lang="zh-Hant">其他人可以做的事</span></td><td><span lang="en">owner</span><span lang="zh-Hant">擁有者</span></td><td><span lang="en">group</span><span lang="zh-Hant">群組</span></td></tr>
+</table>
+</figure>
+<p lang="en"><code>r</code> is read, <code>w</code> is write, and <code>-</code> means no. (For a folder, <code>x</code> means you may enter it; for a file, run it.) The kernel uses <mark>the first set that applies to you: owner, else group, else everyone else</mark>. The link <code>/tmp/mcu</code> shows <code>rwxrwxrwx</code>, but that means nothing: the check is made on the file it points to.</p>
+<p lang="zh-Hant"><code>r</code> 是讀、<code>w</code> 是寫，<code>-</code> 是不行。（對資料夾來說，<code>x</code> 是可以進去；對檔案來說，是可以執行。）核心使用<mark>第一組適用於你的權限：擁有者，不是的話看群組，再不是就看其他人</mark>。連結 <code>/tmp/mcu</code> 顯示 <code>rwxrwxrwx</code>，但那沒有意義：檢查的是它指向的那個檔案。</p>
+
+<p lang="en">Now run the driver as <code>member</code>, an ordinary user. <code>member</code> is not root, not the owner, and not in group <code>tty</code>, so the last set applies: <code>---</code>.</p>
+<p lang="zh-Hant">現在以一般使用者 <code>member</code> 執行 driver。<code>member</code> 不是 root、不是擁有者、也不在 <code>tty</code> 群組，所以適用最後一組：<code>---</code>。</p>
+<pre class="term"><span class="ok">$ su member -s /bin/bash -c "source /opt/ros/humble/setup.bash; python3 /code/driver.py"</span>
+<span class="m">...</span>
+  File "/code/driver.py", line 15, in __init__
+    self.dev = open(DEVICE, 'rb', buffering=0)   # a device is opened like any file
+<span class="b">PermissionError: [Errno 13] Permission denied: '/tmp/mcu'</span></pre>
+<p lang="en">The fix is not to run everything as root. Give the group read and write, and put the user in the group:</p>
+<p lang="zh-Hant">解法不是什麼都用 root 跑。而是讓群組可以讀寫，再把使用者加進那個群組：</p>
+<pre class="term"><span class="ok">$ chmod g+rw /dev/pts/0 &amp;&amp; usermod -aG tty member</span>
+<span class="ok">$ ls -l /dev/pts/0</span>
+crw-rw---- 1 root tty 136, 0 Nov 20 09:28 /dev/pts/0
+<span class="ok">$ su member -c id</span>
+uid=1000(member) gid=1000(member) groups=1000(member),5(tty)
+<span class="ok">$ su member -s /bin/bash -c "source /opt/ros/humble/setup.bash; python3 /code/driver.py"</span>
+<span class="a">[INFO] [driver]: reading /tmp/mcu</span></pre>
+<p lang="en">A real USB serial adapter shows up as something like <code>/dev/ttyUSB0</code> or <code>/dev/ttyACM0</code>, <code>crw-rw----</code>, group <code>dialout</code>. So on your own Linux laptop the fix is <code>sudo usermod -aG dialout $USER</code>, then log out and in again: <mark>a process gets its groups when it starts, so a shell that is already running doesn't have the new one</mark>.</p>
+<p lang="zh-Hant">真正的 USB 序列轉接器會顯示成 <code>/dev/ttyUSB0</code> 或 <code>/dev/ttyACM0</code> 之類的名字，<code>crw-rw----</code>，群組 <code>dialout</code>。所以在你自己的 Linux 筆電上，解法是 <code>sudo usermod -aG dialout $USER</code>，然後登出再登入：<mark>process 在啟動時取得它的群組，已經在跑的 shell 不會有新的群組</mark>。</p>
+
+<h3><span lang="en">The <code>build/</code> folder you can't delete</span><span lang="zh-Hant">刪不掉的 <code>build/</code> 資料夾</span></h3>
+<p lang="en">A container usually runs as root. When it writes into a folder shared with your laptop, the files it creates belong to root on your laptop too, because a user is just a number and the kernel is shared. Here a container plays a build: it makes a folder and one file in it.</p>
+<p lang="zh-Hant">容器通常以 root 執行。當它寫入一個跟你筆電共用的資料夾時，它建立的檔案在你的筆電上也屬於 root，因為使用者只是一個編號，而核心是共用的。這裡用一個容器假裝在編譯：建一個資料夾，裡面放一個檔案。</p>
+<pre class="term"><span class="ok">$ docker run --rm -v "$PWD":/ws -w /ws dit-ros2-tutorial:humble \
+    bash -c 'mkdir -p build/my_pkg &amp;&amp; echo x &gt; build/my_pkg/out.o'</span>
+<span class="ok">$ ls -l build</span>
+drwxr-xr-x 2 root root 60 Nov 20 17:31 my_pkg
+<span class="ok">$ rm -r build</span>
+<span class="b">rm: cannot remove 'build/my_pkg/out.o': Permission denied</span>
+<span class="ok">$ docker run --rm -u "$(id -u):$(id -g)" -v "$PWD":/ws -w /ws dit-ros2-tutorial:humble \
+    bash -c 'mkdir -p build/my_pkg &amp;&amp; echo x &gt; build/my_pkg/out.o'</span>
+<span class="ok">$ ls -l build</span>
+drwxr-xr-x 2 member member 60 Nov 20 17:31 my_pkg</pre>
+<p lang="en">With <code>-u</code>, the container runs as your user number, so its files are yours. This is why many compose files and Dockerfiles take a user ID as a setting. If it already happened, delete the folder from inside a container, as root.</p>
+<p lang="zh-Hant">加上 <code>-u</code>，容器就以你的使用者編號執行，它建立的檔案就是你的。這就是為什麼很多 compose 檔和 Dockerfile 都把使用者 ID 當成一個設定。如果已經發生了，就從容器裡面以 root 刪掉那個資料夾。</p>
+
+<div class="case robot">
+  <div class="case-h"><span lang="en">On a robot</span><span lang="zh-Hant">在機器人上</span></div>
+  <div class="case-t"><span lang="en">Privileged containers skip all of this</span><span lang="zh-Hant">privileged 容器跳過這一切</span></div>
+  <p lang="en">Robot containers are often started with <code>privileged: true</code> and the host's <code>/dev</code> mounted inside: every device is visible and every check passes, so serial ports, cameras and GPIO just work. The price is that the container can do anything to the robot computer: format a disk, load a kernel module, stop any process. That is a fair trade on a robot that only runs your code; it is a bad habit on a shared server. Knowing which check you are skipping helps when the same code moves somewhere stricter.</p>
+  <p lang="zh-Hant">機器人的容器常常用 <code>privileged: true</code> 啟動，並把主機的 <code>/dev</code> 掛進去：每個裝置都看得到、每個檢查都會通過，所以序列埠、相機、GPIO 直接就能用。代價是容器可以對機器人電腦做任何事：格式化硬碟、載入核心模組、停掉任何 process。在只跑你自己程式的機器人上，這是合理的取捨；在共用的伺服器上，這是壞習慣。知道自己跳過了哪個檢查，同一份程式搬到比較嚴格的地方時才不會卡住。</p>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="libs"><small><span lang="en">Part 7</span><span lang="zh-Hant">第 7 部分</span></small><span lang="en">Code you didn't compile</span><span lang="zh-Hant">不是你編譯的程式碼</span></h2>
+
+<p lang="en">Most of the code in a running node isn't yours. A C++ node is an <b>executable</b>, but much of its code sits in <b>shared libraries</b> (<code>.so</code> files): ROS's client library, the message types, DDS. They are separate files, found and loaded <mark>when the program starts, not when it is built</mark>. <code>ldd</code> lists what a program needs and where each one was found (in a shell that sourced ROS; three lines of many):</p>
+<p lang="zh-Hant">正在跑的 node 裡，大部分的程式碼都不是你的。C++ node 是一個<b>執行檔</b>，但它的很多程式碼放在<b>共享函式庫</b>（<code>.so</code> 檔）裡：ROS 的 client library、message 型別、DDS。它們是獨立的檔案，<mark>在程式啟動時才被找到並載入，而不是在編譯時</mark>。<code>ldd</code> 會列出一個程式需要什麼、各自在哪裡找到（在 source 過 ROS 的 shell 裡；節錄三行）：</p>
+<pre class="term"><span class="ok">$ ldd install/my_pkg/lib/my_pkg/slow_server</span>
+	librclcpp.so => /opt/ros/humble/lib/librclcpp.so (0x000079963e2ee000)
+	libexample_interfaces__rosidl_typesupport_cpp.so => /opt/ros/humble/lib/libexample_interfaces__rosidl_typesupport_cpp.so (0x000079963e2de000)
+	libc.so.6 => /lib/x86_64-linux-gnu/libc.so.6 (0x000079963de07000)</pre>
+<p lang="en">In a fresh shell where ROS was never sourced, the same program won't start:</p>
+<p lang="zh-Hant">在一個從沒 source 過 ROS 的新 shell 裡，同一個程式啟動不了：</p>
+<pre class="term"><span class="ok">$ ./slow_server</span>
+<span class="b">./slow_server: error while loading shared libraries: librclcpp.so: cannot open shared object file: No such file or directory</span>
+<span class="ok">$ ldd ./slow_server | grep "not found"</span>
+	librclcpp.so => not found
+	libexample_interfaces__rosidl_typesupport_cpp.so => not found
+	librcl.so => not found</pre>
+
+<h3><span lang="en">What <code>source setup.bash</code> really does</span><span lang="zh-Hant"><code>source setup.bash</code> 到底做了什麼</span></h3>
+<p lang="en">It sets <b>environment variables</b>: settings that a process passes on to every process it starts. Three of them tell programs where to look:</p>
+<p lang="zh-Hant">它設定<b>環境變數</b>：process 會傳給它啟動的每個 process 的設定。其中三個告訴程式去哪裡找：</p>
+<table class="t">
+  <tr><th><span lang="en">Variable</span><span lang="zh-Hant">變數</span></th><th><span lang="en">Who reads it</span><span lang="zh-Hant">誰讀它</span></th><th><span lang="en">For what</span><span lang="zh-Hant">找什麼</span></th></tr>
+  <tr><td><code>LD_LIBRARY_PATH</code></td><td><span lang="en">the loader, when any program starts</span><span lang="zh-Hant">載入器，在任何程式啟動時</span></td><td><span lang="en">shared libraries (<code>.so</code>)</span><span lang="zh-Hant">共享函式庫（<code>.so</code>）</span></td></tr>
+  <tr><td><code>PYTHONPATH</code></td><td>Python</td><td><span lang="en">Python packages, such as <code>rclpy</code></span><span lang="zh-Hant">Python 套件，例如 <code>rclpy</code></span></td></tr>
+  <tr><td><code>AMENT_PREFIX_PATH</code></td><td><span lang="en"><code>ros2</code> commands and launch</span><span lang="zh-Hant"><code>ros2</code> 指令和 launch</span></td><td><span lang="en">ROS packages: where <code>ros2 run</code> finds <code>my_pkg</code></span><span lang="zh-Hant">ROS 套件：<code>ros2 run</code> 去哪裡找 <code>my_pkg</code></span></td></tr>
+</table>
+<p lang="en">Each is a list of folders, searched in order. <code>strace</code> (Part 8) shows the loader doing exactly that while the driver starts: it tries the first folder of <code>LD_LIBRARY_PATH</code>, fails, and finds <code>librcl.so</code> in the second.</p>
+<p lang="zh-Hant">每一個都是資料夾的清單，依序搜尋。<code>strace</code>（第 8 部分）可以看到 driver 啟動時載入器正是這樣做的：先試 <code>LD_LIBRARY_PATH</code> 的第一個資料夾，找不到，再在第二個找到 <code>librcl.so</code>。</p>
+<pre class="term"><span class="ok">$ echo $LD_LIBRARY_PATH</span>
+/opt/ros/humble/lib/x86_64-linux-gnu:/opt/ros/humble/lib
+<span class="ok">$ strace -f -e trace=openat python3 driver.py</span>         <span class="m"># (two lines of many)</span>
+openat(AT_FDCWD, "/opt/ros/humble/lib/x86_64-linux-gnu/librcl.so", O_RDONLY|O_CLOEXEC) = -1 ENOENT (No such file or directory)
+openat(AT_FDCWD, "/opt/ros/humble/lib/librcl.so", O_RDONLY|O_CLOEXEC) = 3</pre>
+
+<h3><span lang="en">Underlay and overlay: the first match wins</span><span lang="zh-Hant">underlay 和 overlay：第一個找到的贏</span></h3>
+<p lang="en">ROS itself, in <code>/opt/ros/humble</code>, is the <b>underlay</b>. Your workspace, built with <code>colcon</code>, is an <b>overlay</b> on top of it. Sourcing the overlay puts its folders <i>in front of</i> the underlay's:</p>
+<p lang="zh-Hant">ROS 本身（<code>/opt/ros/humble</code>）是 <b>underlay</b>。你用 <code>colcon</code> 建的 workspace 是疊在它上面的 <b>overlay</b>。source overlay 會把它的資料夾放在 underlay 的<i>前面</i>：</p>
+<pre class="term"><span class="ok">$ source /opt/ros/humble/setup.bash</span>
+<span class="ok">$ ros2 pkg prefix my_pkg</span>
+<span class="b">Package not found</span>
+<span class="ok">$ source ~/tutorial_ws/install/setup.bash</span>
+<span class="ok">$ ros2 pkg prefix my_pkg</span>
+/root/tutorial_ws/install/my_pkg
+<span class="ok">$ echo $AMENT_PREFIX_PATH</span>
+/root/tutorial_ws/install/my_pkg:/opt/ros/humble</pre>
+<p lang="en">Because the search stops at the first match, <mark>which version of a package you run depends on what was sourced, and in which order</mark>. If a package exists in two workspaces, the one sourced last is in front. And a terminal keeps the variables from when you sourced: a terminal opened before a rebuild, or one that sourced another workspace, can run a different version from the one you just built. When "the change didn't do anything", check <code>ros2 pkg prefix</code> before you check your code.</p>
+<p lang="zh-Hant">因為搜尋在第一個找到時就停，<mark>你跑的是套件的哪個版本，取決於 source 了什麼、以什麼順序</mark>。如果一個套件存在於兩個 workspace，最後 source 的那個排在前面。而終端機會保留你 source 當時的變數：在重新編譯前就開著的終端機，或 source 了別的 workspace 的終端機，跑的版本可能跟你剛建好的不一樣。遇到「改了卻沒效果」時，先查 <code>ros2 pkg prefix</code>，再查你的程式。</p>
+
+<h3><span lang="en">Plugins: loaded by name, at run time</span><span lang="zh-Hant">plugin：在執行時依名字載入</span></h3>
+<p lang="en">Some libraries aren't listed by <code>ldd</code> at all. A <b>plugin</b> is a shared library that a program loads while running, because a parameter or a configuration file names it. Navigation stacks choose their planner and controller this way, and <code>ros2_control</code> loads hardware drivers this way. The program was built without knowing the plugin exists, so <mark>a missing or broken plugin shows up only when the program runs</mark>: a message such as "failed to load plugin" or "undefined symbol" in the log, often from a plugin built against a different version of its library. The checks are the same as above: is the package found (<code>ros2 pkg prefix</code>), and was it built in the workspace you sourced?</p>
+<p lang="zh-Hant">有些函式庫根本不會出現在 <code>ldd</code> 裡。<b>plugin</b> 是程式在執行中才載入的共享函式庫，因為某個參數或設定檔指名了它。導航系統就是這樣選擇它的 planner 和 controller，<code>ros2_control</code> 也是這樣載入硬體驅動。程式編譯時並不知道這個 plugin 存在，所以<mark>plugin 不見或壞掉，只有在程式執行時才會出現</mark>：log 裡出現 "failed to load plugin" 或 "undefined symbol" 之類的訊息，常常是因為 plugin 是對著另一個版本的函式庫編譯的。檢查方式跟上面一樣：找得到這個套件嗎（<code>ros2 pkg prefix</code>）？它是在你 source 的那個 workspace 裡建的嗎？</p>
+
+<div class="quiz">
+  <button><span lang="en"><b>A node runs in one terminal but says "librclcpp.so: cannot open shared object file" in another.</b> What differs?</span><span lang="zh-Hant"><b>一個 node 在一個終端機能跑，在另一個卻說 "librclcpp.so: cannot open shared object file"。</b>差在哪？</span><span class="ans"><span lang="en">The environment. The second terminal never sourced <code>setup.bash</code>, so <code>LD_LIBRARY_PATH</code> doesn't include ROS's folder. Compare <code>echo $LD_LIBRARY_PATH</code> in both.</span><span lang="zh-Hant">環境。第二個終端機沒有 source <code>setup.bash</code>，所以 <code>LD_LIBRARY_PATH</code> 裡沒有 ROS 的資料夾。在兩邊都 <code>echo $LD_LIBRARY_PATH</code> 比較看看。</span></span></button>
+  <button><span lang="en"><b>You fixed a bug, rebuilt, and the robot still shows the bug.</b> Name two OS-level reasons.</span><span lang="zh-Hant"><b>你修了 bug、重新編譯，機器人上還是有那個 bug。</b>說出兩個作業系統層面的原因。</span><span class="ans"><span lang="en">The old process is still running (an orphan from Part 4, or a launch nobody stopped), or the terminal that started it sourced another workspace that has its own copy of the package (this Part).</span><span lang="zh-Hant">舊的 process 還在跑（第 4 部分的孤兒，或沒人停掉的 launch），或者啟動它的終端機 source 了另一個也有這個套件的 workspace（這個部分）。</span></span></button>
+</div>
+
+<div class="try">
+  <div class="try-h"><span lang="en">Try it</span><span lang="zh-Hant">動手試</span></div>
+  <div class="try-t"><span lang="en">Permission denied, then a missing library</span><span lang="zh-Hant">permission denied，然後是找不到函式庫</span></div>
+  <ol>
+    <li><span lang="en">In T2: <code>python3 /code/fake_mcu.py &amp;</code>, then <code>ls -l /tmp/mcu $(readlink /tmp/mcu)</code>. Read the permissions aloud: who may read?</span><span lang="zh-Hant">在 T2：<code>python3 /code/fake_mcu.py &amp;</code>，再 <code>ls -l /tmp/mcu $(readlink /tmp/mcu)</code>。把權限唸出來：誰可以讀？</span></li>
+    <li><span lang="en"><code>useradd -m member</code>, then <code>su member -s /bin/bash -c "source /opt/ros/humble/setup.bash; python3 /code/driver.py"</code>. Fix it with a group, without making <code>member</code> root.</span><span lang="zh-Hant"><code>useradd -m member</code>，再 <code>su member -s /bin/bash -c "source /opt/ros/humble/setup.bash; python3 /code/driver.py"</code>。用群組修好它，不要讓 <code>member</code> 變成 root。</span></li>
+    <li><span lang="en"><code>ldd ~/tutorial_ws/install/my_pkg/lib/my_pkg/slow_server</code>. Then run the same program with <code>env -i</code> in front (an empty environment) and read the error.</span><span lang="zh-Hant"><code>ldd ~/tutorial_ws/install/my_pkg/lib/my_pkg/slow_server</code>。再在同一個程式前面加 <code>env -i</code>（空的環境）執行，讀錯誤訊息。</span></li>
+  </ol>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="deeper" class="deeper"><small><span lang="en">Part 8 · Go deeper</span><span lang="zh-Hant">第 8 部分 · 延伸</span></small><span lang="en">Tools and details for later</span><span lang="zh-Hant">之後再看的工具和細節</span></h2>
+
+<details class="deeper">
+  <summary><span lang="en">Go deeper: zombies, and why <code>docker run --init</code> exists</span><span lang="zh-Hant">延伸：zombie，以及為什麼有 <code>docker run --init</code></span> <small><span lang="en">read after the session</span><span lang="zh-Hant">課後再讀</span></small></summary>
+  <p lang="en">When a process ends, the kernel keeps a small record of it, its exit code, until its parent reads it with <code>wait()</code>. Until then the process is a <b>zombie</b>: dead, but still in the table. The launcher's log line "process has died [..., exit code -2]" is the launcher reading that record. Orphans are adopted by PID 1, and a normal PID 1 (systemd, or <code>tini</code> in a container started with <code>--init</code>) reads their records too. But if PID 1 is a program that never calls <code>wait()</code>, zombies pile up. Our first test container ran <code>sleep infinity</code> as PID 1, and after a few experiments it looked like this:</p>
+  <p lang="zh-Hant">process 結束時，核心會保留它的一小筆紀錄（exit code），直到它的父 process 用 <code>wait()</code> 讀走。在那之前，這個 process 是 <b>zombie</b>：已經死了，但還留在表裡。launcher 的 log「process has died [..., exit code -2]」就是 launcher 讀到了這筆紀錄。孤兒由 PID 1 收養，正常的 PID 1（systemd，或用 <code>--init</code> 啟動的容器裡的 <code>tini</code>）也會讀走它們的紀錄。但如果 PID 1 是一個從不呼叫 <code>wait()</code> 的程式，zombie 就會越積越多。我們第一個測試容器用 <code>sleep infinity</code> 當 PID 1，做了幾次實驗之後變成這樣：</p>
+<pre class="term">    PID    PPID TT       CMD
+    362       1 ?        [ros2] &lt;defunct&gt;
+    363       1 ?        [python3] &lt;defunct&gt;
+    365       1 ?        [python3] &lt;defunct&gt;
+    367       1 ?        [python3] &lt;defunct&gt;
+<span class="m">    ... 19 more</span></pre>
+  <p lang="en">Zombies use no CPU or memory, only a PID each. But a container that runs for weeks can run out. <code>docker run --init</code> (or <code>init: true</code> in compose) puts a tiny PID 1 in front of your program that does nothing but pass signals on and read exit codes.</p>
+  <p lang="zh-Hant">zombie 不用 CPU 也不用記憶體，只各佔一個 PID。但跑了好幾個禮拜的容器可能會用完。<code>docker run --init</code>（或 compose 裡的 <code>init: true</code>）會在你的程式前面放一個很小的 PID 1，它只做兩件事：把 signal 傳下去、讀走 exit code。</p>
+</details>
+
+<details class="deeper">
+  <summary><span lang="en">Go deeper: <code>strace</code>, watching a process talk to the kernel</span><span lang="zh-Hant">延伸：<code>strace</code>，看 process 跟核心對話</span> <small><span lang="en">read after the session</span><span lang="zh-Hant">課後再讀</span></small></summary>
+  <p lang="en">A process can't open a file, send a packet or start a child by itself; it asks the kernel with a <b>system call</b>. <code>strace</code> prints every system call a program makes. It is the tool to reach for when a program fails without saying why: which file did it try to open, and what did the kernel answer? Here the driver opens the serial port, and gets file number 15. Afterwards <code>ls -l /proc/PID/fd</code> lists it as <code>15 -&gt; /dev/pts/1</code>:</p>
+  <p lang="zh-Hant">process 沒辦法自己開檔案、送封包或啟動子 process；它要透過<b>系統呼叫</b>（system call）請核心做。<code>strace</code> 會印出程式做的每個系統呼叫。當程式失敗卻不說原因時，就用它：它試著開哪個檔案？核心回答了什麼？這裡 driver 開啟序列埠，拿到檔案編號 15。之後 <code>ls -l /proc/PID/fd</code> 會把它列成 <code>15 -&gt; /dev/pts/1</code>：</p>
+<pre class="term"><span class="ok">$ strace -f -e trace=openat python3 driver.py</span>
+<span class="m">...</span>
+[pid   532] openat(AT_FDCWD, "/tmp/mcu", O_RDONLY|O_CLOEXEC) = 15</pre>
+  <p lang="en">Install it with <code>apt-get install -y strace</code>. <code>-f</code> follows threads and children; <code>-e trace=</code> picks which calls to show; <code>-p PID</code> attaches to a process that is already running.</p>
+  <p lang="zh-Hant">用 <code>apt-get install -y strace</code> 安裝。<code>-f</code> 會跟著執行緒和子 process；<code>-e trace=</code> 選擇要顯示哪些呼叫；<code>-p PID</code> 可以接上一個已經在跑的 process。</p>
+</details>
+
+<details class="deeper">
+  <summary><span lang="en">Go deeper: stable device names with udev rules</span><span lang="zh-Hant">延伸：用 udev rule 取得固定的裝置名稱</span> <small><span lang="en">read after the session</span><span lang="zh-Hant">課後再讀</span></small></summary>
+  <p lang="en">Plug in two USB serial adapters and they become <code>/dev/ttyUSB0</code> and <code>/dev/ttyUSB1</code>, in whatever order they were detected, which can change at the next boot. <b>udev</b> is the daemon that creates device files when hardware appears, and a <b>udev rule</b> tells it to add a fixed name, a symlink, chosen by something unique to the device: its USB vendor and product ID, or its serial number. That is the same idea as our <code>/tmp/mcu → /dev/pts/0</code>. A rule can also set the group and mode, which solves Part 6 for that one device:</p>
+  <p lang="zh-Hant">插上兩個 USB 序列轉接器，它們會變成 <code>/dev/ttyUSB0</code> 和 <code>/dev/ttyUSB1</code>，順序看偵測的先後，下次開機可能就不一樣。<b>udev</b> 是硬體出現時建立裝置檔的 daemon，而 <b>udev rule</b> 告訴它根據裝置獨有的東西（USB 廠商和產品 ID，或序號）加上一個固定的名字：一個 symlink。這跟我們的 <code>/tmp/mcu → /dev/pts/0</code> 是同一個概念。rule 也可以設定群組和權限，這樣就解決了那個裝置的第 6 部分問題：</p>
+<pre data-lang="sh"># /etc/udev/rules.d/99-robot.rules  (the IDs are an example: read yours with `udevadm info /dev/ttyUSB0`)
+SUBSYSTEM=="tty", ATTRS{idVendor}=="0483", ATTRS{idProduct}=="5740", SYMLINK+="mcu", GROUP="dialout", MODE="0660"</pre>
+  <p lang="en">Reload with <code>sudo udevadm control --reload &amp;&amp; sudo udevadm trigger</code>. Rules live on the host, not in the container: the host's udev creates <code>/dev/mcu</code>, and a container sees it if <code>/dev</code> is shared.</p>
+  <p lang="zh-Hant">用 <code>sudo udevadm control --reload &amp;&amp; sudo udevadm trigger</code> 重新載入。rule 放在主機上，不是容器裡：主機的 udev 建立 <code>/dev/mcu</code>，容器只要共用 <code>/dev</code> 就看得到。</p>
+</details>
+
+<details class="deeper">
+  <summary><span lang="en">Go deeper: permission bits as numbers</span><span lang="zh-Hant">延伸：用數字表示權限位元</span> <small><span lang="en">read after the session</span><span lang="zh-Hant">課後再讀</span></small></summary>
+  <p lang="en">Each <code>rwx</code> group is three bits: r = 4, w = 2, x = 1. So <code>rw-</code> is 6, <code>r-x</code> is 5, and <code>crw-rw----</code> is mode <code>660</code>. <code>chmod 660 file</code> sets all three groups at once; <code>chmod g+rw file</code> changes only what you name. There are three more bits, rarely needed: <b>setuid</b> (the program runs as its owner, which is how <code>sudo</code> becomes root), <b>setgid</b>, and the <b>sticky</b> bit (on <code>/tmp</code>: anyone may create files there, but only the owner may delete them).</p>
+  <p lang="zh-Hant">每組 <code>rwx</code> 是三個位元：r = 4、w = 2、x = 1。所以 <code>rw-</code> 是 6，<code>r-x</code> 是 5，<code>crw-rw----</code> 是權限 <code>660</code>。<code>chmod 660 file</code> 一次設定三組；<code>chmod g+rw file</code> 只改你指定的部分。另外還有三個很少用到的位元：<b>setuid</b>（程式以它的擁有者身分執行，<code>sudo</code> 就是這樣變成 root 的）、<b>setgid</b>，以及 <b>sticky</b> 位元（在 <code>/tmp</code> 上：任何人都能在裡面建檔案，但只有擁有者能刪除）。</p>
+</details>
+
+<details class="deeper">
+  <summary><span lang="en">Go deeper: starting software at boot with systemd</span><span lang="zh-Hant">延伸：用 systemd 在開機時啟動軟體</span> <small><span lang="en">read after the session</span><span lang="zh-Hant">課後再讀</span></small></summary>
+  <p lang="en">On most Linux computers, PID 1 is <b>systemd</b>. Besides adopting orphans, it starts daemons at boot, restarts them when they crash, and stops them in order at shutdown. Each daemon is described by a <b>unit</b> file. A robot that should start its software when it is switched on, with no one logging in, can use one:</p>
+  <p lang="zh-Hant">在大部分 Linux 電腦上，PID 1 是 <b>systemd</b>。除了收養孤兒，它還在開機時啟動 daemon、在它們當掉時重新啟動、關機時依序停掉它們。每個 daemon 用一個 <b>unit</b> 檔描述。希望一開機、不用人登入就啟動軟體的機器人，可以用一個：</p>
+<pre data-lang="sh"># /etc/systemd/system/robot.service  (an example)
+[Unit]
+Description=Robot stack
+After=docker.service
+Requires=docker.service
+
+[Service]
+ExecStart=/usr/bin/docker compose -f /home/robot/compose.yaml up
+ExecStop=/usr/bin/docker compose -f /home/robot/compose.yaml down
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target</pre>
+  <p lang="en"><code>sudo systemctl enable --now robot</code> starts it now and at every boot; <code>systemctl status robot</code> and <code>journalctl -u robot</code> show its state and output. When you stop it, systemd sends SIGTERM and, after a timeout, SIGKILL: the same story as Part 4.</p>
+  <p lang="zh-Hant"><code>sudo systemctl enable --now robot</code> 會立刻啟動它，並在每次開機時啟動；<code>systemctl status robot</code> 和 <code>journalctl -u robot</code> 會顯示它的狀態和輸出。停止它時，systemd 會送 SIGTERM，逾時後再送 SIGKILL：跟第 4 部分是同一個故事。</p>
+</details>
+
+<details class="deeper">
+  <summary><span lang="en">Go deeper: <code>top</code>, and more of <code>/proc</code></span><span lang="zh-Hant">延伸：<code>top</code>，以及更多 <code>/proc</code></span> <small><span lang="en">read after the session</span><span lang="zh-Hant">課後再讀</span></small></summary>
+  <p lang="en"><code>top</code> (or the friendlier <code>htop</code>) lists processes sorted by CPU use, live. Press <code>H</code> to see threads, and <code>1</code> to see each CPU core. A node at 100 % of one core is usually a loop that never sleeps. Every number in <code>top</code> comes from <code>/proc</code>, and there is more there: <code>/proc/PID/environ</code> holds the environment a process started with (useful to check which workspace it sourced: <code>tr '\0' '\n' &lt; /proc/PID/environ | grep AMENT</code>), <code>/proc/PID/maps</code> lists every library it loaded, and <code>/proc/cpuinfo</code> and <code>/proc/meminfo</code> describe the machine. OS‑2 uses these to look at memory and threads.</p>
+  <p lang="zh-Hant"><code>top</code>（或比較好用的 <code>htop</code>）會即時依 CPU 使用率列出 process。按 <code>H</code> 看執行緒，按 <code>1</code> 看每個 CPU 核心。一個佔滿一個核心 100 % 的 node，通常是一個從不 sleep 的迴圈。<code>top</code> 裡的每個數字都來自 <code>/proc</code>，而 <code>/proc</code> 裡還有更多：<code>/proc/PID/environ</code> 是 process 啟動時的環境變數（可以用來檢查它 source 了哪個 workspace：<code>tr '\0' '\n' &lt; /proc/PID/environ | grep AMENT</code>），<code>/proc/PID/maps</code> 列出它載入的每個函式庫，<code>/proc/cpuinfo</code> 和 <code>/proc/meminfo</code> 描述這台機器。OS‑2 會用它們來看記憶體和執行緒。</p>
+  <p lang="en">More of what the kernel knows about one process (the driver, in another run):</p>
+  <p lang="zh-Hant">核心對一個 process 還知道更多（driver，另一次執行）：</p>
+<pre class="term"><span class="ok">$ tr '\0' ' ' &lt; /proc/365/cmdline; readlink /proc/365/cwd /proc/365/exe</span>
+python3 /code/driver.py      <span class="m"># the command line it was started with</span>
+/code                        <span class="m"># its working folder</span>
+/usr/bin/python3.10          <span class="m"># the program file it runs</span>
+<span class="ok">$ ls -l /proc/365/fd</span>
+lr-x------ 1 root root 64 Nov 20 09:29 0 -> pipe:[310979]
+l-wx------ 1 root root 64 Nov 20 09:29 1 -> pipe:[310980]
+lrwx------ 1 root root 64 Nov 20 09:29 10 -> socket:[306845]
+lr-x------ 1 root root 64 Nov 20 09:29 11 -> /dev/shm/fastrtps_port7413_el
+<span class="m">...</span></pre>
+  <p lang="en"><code>fd</code> lists every open file by number. 0 and 1 are its input and output, connected to the launcher by pipes; the sockets and <code>/dev/shm</code> files are DDS talking to other nodes.</p>
+  <p lang="zh-Hant"><code>fd</code> 依編號列出所有開著的檔案。0 和 1 是它的輸入和輸出，用 pipe 接到 launcher；socket 和 <code>/dev/shm</code> 的檔案是 DDS 在跟其他 node 溝通。</p>
+</details>
+
+<!-- ============================================================ -->
+<h2 id="takehome"><small><span lang="en">Take home</span><span lang="zh-Hant">帶回家</span></small><span lang="en">What you can now explain</span><span lang="zh-Hant">你現在能解釋的事</span></h2>
+<p lang="en">Tick each one you could explain to a teammate without looking at this page.</p>
+<p lang="zh-Hant">不看這一頁也能跟隊友解釋清楚的，就打勾。</p>
+<ul class="goals">
+  <li><span lang="en">I can say the difference between a program and a process, and find a node's PID and parent with <code>ps</code>, and say what <code>fork</code>, <code>exec</code> and <code>wait</code> each do.</span><span lang="zh-Hant">我能說出程式和 process 的差別，並用 <code>ps</code> 找到 node 的 PID 和父 process，也能說出 <code>fork</code>、<code>exec</code>、<code>wait</code> 各做什麼。</span></li>
+  <li><span lang="en">I can explain why <code>kill</code> on a launcher can leave its nodes running, and what PID 1 has to do with it.</span><span lang="zh-Hant">我能解釋為什麼對 launcher 下 <code>kill</code> 可能讓它的 node 繼續跑，以及這跟 PID 1 有什麼關係。</span></li>
+  <li><span lang="en">I can name SIGINT, SIGTERM, SIGHUP and SIGKILL, what sends each one, and which one can't be caught.</span><span lang="zh-Hant">我能說出 SIGINT、SIGTERM、SIGHUP 和 SIGKILL，各是誰送的，以及哪一個接不住。</span></li>
+  <li><span lang="en">I can explain why a launch dies when SSH drops, and why it survives inside tmux.</span><span lang="zh-Hant">我能解釋為什麼 SSH 斷線時 launch 會死，以及為什麼在 tmux 裡就不會。</span></li>
+  <li><span lang="en">I know why <code>ros2 node list</code> can show nodes that are gone, and how to check.</span><span lang="zh-Hant">我知道為什麼 <code>ros2 node list</code> 可能顯示已經不存在的 node，以及怎麼確認。</span></li>
+  <li><span lang="en">I can read <code>ls -l</code>, and fix "Permission denied" on a device without running as root.</span><span lang="zh-Hant">我能讀懂 <code>ls -l</code>，並且不用 root 就修好裝置的 "Permission denied"。</span></li>
+  <li><span lang="en">I can explain what <code>source setup.bash</code> changes, and why the order of sourcing decides which version runs.</span><span lang="zh-Hant">我能解釋 <code>source setup.bash</code> 改了什麼，以及為什麼 source 的順序決定跑的是哪個版本。</span></li>
+  <li class="deeper"><span lang="en">I can explain what a zombie is, and why a container may need <code>--init</code>.</span><span lang="zh-Hant">我能解釋 zombie 是什麼，以及為什麼容器可能需要 <code>--init</code>。</span></li>
+</ul>
+
+<h2 id="credits" data-map="no"><small><span lang="en">Attribution</span><span lang="zh-Hant">出處</span></small><span lang="en">Credits</span><span lang="zh-Hant">致謝</span></h2>
+<ul class="credits">
+  <li><span lang="en">The code is in <code>code/</code>. Every example was run in <code>dit-ros2-tutorial:humble</code> (ROS 2 Humble) on 2026-11-20, and the outputs above are from those runs. ROS log timestamps and Python tracebacks were cut where marked; PIDs differ between runs.</span><span lang="zh-Hant">程式碼在 <code>code/</code>。每個範例都在 2026-11-20 於 <code>dit-ros2-tutorial:humble</code>（ROS 2 Humble）上執行過，上面的輸出都來自那些執行結果。ROS log 的時間戳記和 Python traceback 在標示處有刪減；每次執行的 PID 都不一樣。</span></li>
+  <li><span lang="en">The signal handling of <code>ros2 launch</code> is in <code>launch/launch_service.py</code> of ROS 2 Humble (Apache License 2.0).</span><span lang="zh-Hant"><code>ros2 launch</code> 處理 signal 的方式在 ROS 2 Humble 的 <code>launch/launch_service.py</code>（Apache License 2.0）。</span></li>
+</ul>
+
+<footer class="ws-foot"><span lang="en">DIT Robotics · Software courses · OS‑1</span><span lang="zh-Hant">DIT Robotics · 軟體課程 · OS‑1</span></footer>
+</div>
+<script src="../assets/worksheet.js"></script>
+</body>
+</html>

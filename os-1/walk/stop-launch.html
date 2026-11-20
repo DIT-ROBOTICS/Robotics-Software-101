@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Walkthrough 1: Two ways to stop a launch</title>
+<script src="../../assets/lang.js"></script>
+<link rel="stylesheet" href="../../assets/walk.css">
+<style>
+  main { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .term.plain .ln { grid-template-columns: 1fr; }
+  .term.plain .ln > span { white-space: pre-wrap; }
+  .term .p { color: var(--sig-bright); }
+  .term .e { color: #ff8f84; }
+  .tname { font: 700 .66rem var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); margin: 0 0 -.4rem .1rem; }
+  /* the process tree */
+  .tree { display: flex; flex-direction: column; gap: .45rem; }
+  .kids { display: flex; flex-direction: column; gap: .45rem; margin-left: 1.3rem; padding-left: .8rem; border-left: 2px solid var(--line); }
+  .proc { border: 1px solid var(--line); border-left: 4px solid var(--c, var(--os)); border-radius: 0 var(--r) var(--r) 0; background: #fff; padding: .3rem .6rem; font-size: .9rem; display: flex; gap: .7rem; align-items: baseline; flex-wrap: wrap; }
+  .proc .pid { font: 700 .95rem var(--mono); color: var(--c, var(--os)); }
+  .proc .nm { font-family: var(--mono); font-size: .85rem; }
+  .proc small { color: var(--muted); font-size: .76rem; margin-left: auto; }
+  .proc.a { --c: var(--a); } .proc.b { --c: var(--b); } .proc.hw { --c: var(--hw); } .proc.sh { --c: var(--exec); }
+  .proc.orphan { background: var(--bad-t); }
+  .grp { border: 1.5px dashed var(--sig); border-radius: var(--r); padding: .45rem .5rem .5rem; position: relative; display: flex; flex-direction: column; gap: .45rem; }
+  .grp > .gl { font: 700 .6rem var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--sig-ink); }
+  .kern { font-size: .92rem; }
+  .kern .sig { font: 700 1rem var(--mono); color: var(--bad); }
+  .kern .sig.int { color: var(--ok); }
+  .kern .nt { color: var(--muted); font-size: .85rem; }
+  #arrows path.sig { stroke: var(--bad); stroke-width: 3; } #arrows polygon.sig { fill: var(--bad); } #arrows text.sig { fill: var(--bad); }
+  #arrows path.int { stroke: var(--ok); stroke-width: 3; } #arrows polygon.int { fill: var(--ok); } #arrows text.int { fill: var(--ok); }
+</style>
+</head>
+<body class="walk" data-title="Walkthrough 1: Two ways to stop a launch" data-title-zh="逐步解說 1：停止 launch 的兩種方法"
+      data-sub="kill vs Ctrl+C" data-sub-zh="kill 與 Ctrl+C" data-back="../index.html#signals">
+<script src="../../assets/walk.js"></script>
+
+<main>
+  <section class="col">
+    <h2><span lang="en">Two terminals</span><span lang="zh-Hant">兩個終端機</span> <small><span lang="en">T1 runs the launch; T2 is where you type commands</span><span lang="zh-Hant">T1 跑 launch；T2 用來下指令</span></small></h2>
+    <div id="left"></div>
+  </section>
+  <section class="col">
+    <h2><span lang="en">The process tree</span><span lang="zh-Hant">process 樹</span> <small><span lang="en">who started whom, as <code>ps --forest</code> shows it</span><span lang="zh-Hant">誰啟動了誰，就像 <code>ps --forest</code> 顯示的</span></small></h2>
+    <div id="right"></div>
+  </section>
+</main>
+
+<script>
+/* MODEL. Two real runs of code/robot.launch.py in the Humble container (2026-11-20).
+   Run 1 (sections A, B): `kill 471` from a second terminal. Run 2 (section C): Ctrl+C in T1.
+   PIDs, log lines and exit codes are copied from those runs; ROS timestamps and tracebacks are cut.
+   PID 1 was the container's first process. */
+function initialState() {
+  return { procs: [], t1: [], t2: [], f1: 0, f2: 0, kern: null, grp: false };
+}
+function begin(s) { s.f1 = s.t1.length; s.f2 = s.t2.length; }
+const p1 = (s, cls, text) => s.t1.push([cls, text]);
+const p2 = (s, cls, text) => s.t2.push([cls, text]);
+const proc = (pid, ppid, name, who, extra) => Object.assign({ pid, ppid, name, who, dead: false, tag: '' }, extra || {});
+const find = (s, pid) => s.procs.find(p => p.pid === pid);
+
+function run1(s) {
+  s.procs = [proc(1, 0, T('PID 1 · the container\'s first process', 'PID 1 · 容器的第一個 process'), 'os'),
+             proc(463, 1, 'bash', 'sh', { note: 'T1' })];
+}
+function run1children(s) {
+  s.procs.push(proc(472, 471, 'python3 fake_mcu.py', 'hw'), proc(474, 471, 'python3 driver.py', 'a'), proc(476, 471, 'python3 monitor.py', 'a'));
+}
+
+/* ---------- drawing ---------- */
+function termHtml(id, name, lines, fresh) {
+  const body = lines.slice(-11).map(([c, t], i, arr) => {
+    const isNew = lines.length - arr.length + i >= fresh;
+    return `<div class="ln ${isNew ? 'fresh' : ''}"><span class="${c}">${c === 'm' ? t : esc(t)}</span></div>`;
+  }).join('') || `<div class="ln"><span class="m">${T('(empty)', '（空的）')}</span></div>`;
+  return `<div class="tname">${name}</div><div class="term plain" id="${id}">${body}</div>`;
+}
+
+function treeHtml(s, ppid) {
+  const kids = s.procs.filter(p => p.ppid === ppid);
+  if (!kids.length) return '';
+  const boxes = kids.map(p => {
+    const sub = treeHtml(s, p.pid);
+    const cls = `proc ${p.who} ${p.dead ? 'gone' : ''} ${p.orphan ? 'orphan' : ''}`;
+    const tag = p.tag && !p.dead ? ` data-tag="${p.tag}"` : '';
+    return `<div class="${cls}" id="p-${p.pid}"${tag}><span class="pid">${p.pid}</span><span class="nm">${p.name}</span><small>${p.note || 'PPID ' + p.ppid}</small></div>` + (sub ? `<div class="kids">${sub}</div>` : '');
+  });
+  // the launcher and its children share one process group: draw a box around them
+  if (s.grp && kids.some(p => p.grpLead)) {
+    const lead = kids.find(p => p.grpLead);
+    const i = kids.indexOf(lead);
+    boxes[i] = `<div class="grp" id="grp"><span class="gl">${T('foreground process group of T1', 'T1 的前景 process group')}</span>${boxes[i]}</div>`;
+  }
+  return boxes.join('');
+}
+
+function renderPanels(s, H) {
+  $('left').innerHTML = termHtml('t1', 'T1', s.t1, s.f1) + termHtml('t2', 'T2', s.t2, s.f2);
+  const k = s.kern
+    ? `<div class="kern"><span class="sig ${s.kern.sig === 'SIGINT' ? 'int' : ''}">${s.kern.sig}</span> → ${s.kern.to}<br><span class="nt">${s.kern.note || ''}</span></div>`
+    : `<div class="empty">${T('no signal being delivered', '目前沒有送出 signal')}</div>`;
+  $('right').innerHTML =
+    panel('kernel', actor('os', T('Linux kernel', 'Linux 核心')), T('delivers every signal', '負責送出每個 signal'), k) +
+    `<div class="tree">${treeHtml(s, 0)}</div>`;
+}
+
+/* ---------- steps ---------- */
+const PARTS = {
+  A: { title: T('Three nodes, one launcher', '三個 node，一個 launcher'), kind: 'before',
+       intro: T('Run 1. Everything works so far. Usually you would stop it with Ctrl+C in T1; this time T1 is out of reach.', '第一次執行。目前一切正常。平常你會在 T1 按 Ctrl+C 停掉它；這次 T1 碰不到。') },
+  B: { title: T('kill on the launcher', '對 launcher 下 kill'), kind: 'bug',
+       intro: T('T1 is out of reach, so from T2: <code>kill 471</code>, the usual way to stop a process you found in <code>ps</code>.', 'T1 碰不到，所以在 T2 打 <code>kill 471</code>：在 <code>ps</code> 找到 process 後，通常就是這樣停它。') },
+  C: { title: T('Ctrl+C in its own terminal', '在它自己的終端機按 Ctrl+C'), kind: 'fix',
+       intro: T('Run 2, so the PIDs are new. Same launch file, same three nodes. This time: Ctrl+C in T1.', '第二次執行，所以 PID 都是新的。同一個 launch 檔、同樣三個 node。這次在 T1 按 Ctrl+C。') },
+  R: { title: T('What you should have seen', '你應該看到的'), kind: 'recap' },
+};
+const A = 'A', B = 'B', C = 'C';
+const LAUNCHER = { label: 'launcher', color: 'var(--b)' };
+
+const STEPS = [
+  { part: A, title: T(`T1 runs <code>ros2 launch</code>: ${actor('b', 'the launcher')} is a new process`, `T1 執行 <code>ros2 launch</code>：${actor('b', 'launcher')} 是一個新的 process`),
+    narr: T(`You type a command in T1. The shell, <code>bash</code> (PID 463), asks ${actor('os', 'the kernel')} for a copy of itself (<b>fork</b>), and the copy replaces its program with <code>ros2</code> (<b>exec</b>). The result is a new <b>process</b>: a running program with its own number, the <b>PID</b> 471. Its <b>parent</b> is the shell, so its <b>PPID</b> is 463.`,
+            `你在 T1 打了一個指令。shell（<code>bash</code>，PID 463）請 ${actor('os', '核心')}複製一份自己（<b>fork</b>），複製出來的那份再把自己的程式換成 <code>ros2</code>（<b>exec</b>）。結果就是一個新的 <b>process</b>：一個正在跑的程式，有自己的編號 <b>PID</b> 471。它的<b>父 process</b> 是 shell，所以它的 <b>PPID</b> 是 463。`),
+    apply: s => { run1(s); begin(s); p1(s, 'p', '# ros2 launch robot.launch.py');
+      s.procs.push(proc(471, 463, 'ros2 launch robot.launch.py', 'b'));
+      return { hot: ['p-471'], call: { who: 'os', act: 'fork() + exec("ros2 launch ...")', ret: 'PID 471' } }; } },
+
+  { part: A, title: T(`${actor('b', 'The launcher')} starts three children`, `${actor('b', 'launcher')} 啟動三個子 process`),
+    narr: T(`The launch file lists three programs. For each one, the launcher does the same fork + exec, so each becomes a separate process with the launcher as its parent. Two of them are ROS nodes (<code>driver</code>, <code>monitor</code>); <code>fake_mcu</code> plays a microcontroller on a fake serial port. <mark>A node is just a process; the launcher is its parent.</mark>`,
+            `launch 檔裡列了三個程式。launcher 對每一個都做同樣的 fork + exec，所以每個都是獨立的 process，父 process 都是 launcher。其中兩個是 ROS node（<code>driver</code>、<code>monitor</code>）；<code>fake_mcu</code> 假裝成一個接在假序列埠上的微控制器。<mark>node 就是一個 process，launcher 是它的父 process。</mark>`),
+    apply: s => { begin(s); run1children(s);
+      p1(s, '', '[INFO] [python3-1]: process started with pid [472]');
+      p1(s, '', '[python3-1] fake_mcu: /tmp/mcu -> /dev/pts/1');
+      p1(s, '', '[INFO] [python3-2]: process started with pid [474]');
+      p1(s, '', '[INFO] [python3-3]: process started with pid [476]');
+      return { hot: ['p-472', 'p-474', 'p-476'], arrows: [['p-471', 'p-474', 'flow', ['fork + exec', 'fork + exec']]] }; } },
+
+  { part: A, title: T('T2 looks at the tree', 'T2 看一下這棵樹'),
+    narr: T(`In a second terminal, <code>ps</code> lists the processes with their PID and PPID, which is exactly this tree. <code>ros2 node list</code> shows the two nodes. The monitor prints the latest wheel ticks once a second.`,
+            `在第二個終端機，<code>ps</code> 會列出每個 process 的 PID 和 PPID，正好就是這棵樹。<code>ros2 node list</code> 顯示兩個 node。monitor 每秒印一次最新的輪子 tick。`),
+    apply: s => { begin(s);
+      p1(s, '', '[python3-3] [INFO] [monitor]: ticks = 63');
+      p1(s, '', '[python3-3] [INFO] [monitor]: ticks = 133');
+      p2(s, 'p', '# ps -e -o pid,ppid,cmd');
+      p2(s, '', '    471     463 /usr/bin/python3 /opt/ros/humble/bin/ros2 launch robot.launch.py');
+      p2(s, '', '    472     471 python3 /code/fake_mcu.py');
+      p2(s, '', '    474     471 python3 /code/driver.py');
+      p2(s, '', '    476     471 python3 /code/monitor.py');
+      p2(s, 'p', '# ros2 node list'); p2(s, '', '/driver'); p2(s, '', '/monitor');
+      return { hot: ['t2'] }; } },
+
+  { part: B, title: T(`<code>kill 471</code>: ${actor('os', 'the kernel')} sends SIGTERM to one process`, `<code>kill 471</code>：${actor('os', '核心')}送 SIGTERM 給一個 process`),
+    narr: T(`<code>kill</code> does not kill anything by itself. It asks the kernel to deliver a <b>signal</b>, a short notice with a number, to one PID. Without an option it sends <b>SIGTERM</b>, "please terminate". <mark>The signal goes to PID 471 only</mark>: not to its children.`,
+            `<code>kill</code> 本身不會殺掉任何東西。它請核心把一個 <b>signal</b>（一個帶編號的簡短通知）送到某個 PID。沒加選項時送的是 <b>SIGTERM</b>，意思是「請結束」。<mark>這個 signal 只送到 PID 471</mark>，不會送到它的子 process。`),
+    apply: s => { begin(s); p2(s, 'p', '# kill 471');
+      s.kern = { sig: 'SIGTERM', to: 'PID 471', note: T('the default signal of <code>kill</code>', '<code>kill</code> 預設送的 signal') };
+      find(s, 471).tag = 'SIGTERM';
+      return { hot: ['p-471', 'kernel'], arrows: [['kernel', 'p-471', 'sig']],
+               call: { who: 'os', act: 'kill(471, SIGTERM)', note: T('one PID, one signal', '一個 PID、一個 signal') } }; } },
+
+  { part: B, title: T(`${actor('b', 'The launcher')} doesn't catch SIGTERM, so it just dies`, `${actor('b', 'launcher')} 沒有接 SIGTERM，所以直接死掉`),
+    narr: T(`A process can <b>catch</b> a signal: run its own function when it arrives, for example to stop its children first. If it doesn't, the kernel applies the <b>default action</b>, and for SIGTERM that is: end the process now. In Humble, <code>ros2 launch</code> catches only SIGINT; <code>/proc/471/status</code> says so. <mark>So the launcher ends at once, and never tells its children.</mark> T1 prints <code>Terminated</code>.`,
+            `process 可以<b>接住</b>（catch）signal：signal 到的時候跑自己的函式，例如先把子 process 停掉。沒接的話，核心就執行<b>預設動作</b>，SIGTERM 的預設動作是：立刻結束這個 process。在 Humble，<code>ros2 launch</code> 只接 SIGINT，<code>/proc/471/status</code> 裡寫得很清楚。<mark>所以 launcher 立刻結束，完全沒通知它的子 process。</mark>T1 印出 <code>Terminated</code>。`),
+    apply: s => { begin(s); find(s, 471).dead = true; s.kern = null; p1(s, 'e', 'Terminated'); p1(s, 'p', '#');
+      return { hot: ['p-471', 't1'], call: { who: LAUNCHER, act: 'SIGTERM: not caught', ret: T('default action: terminate', '預設動作：結束'), bad: true } }; } },
+
+  { part: B, title: T('The children are orphans, and PID 1 adopts them', '子 process 成了孤兒，由 PID 1 收養'),
+    narr: T(`A process whose parent has died is an <b>orphan</b>. The kernel does not stop orphans; it gives them a new parent, PID 1 (in a container, its first process). <mark>The nodes never got a signal, so they keep running</mark>: <code>ros2 node list</code> still shows them, and <code>ps</code> shows PPID 1. This is the puzzle from Part 1. They will run until someone stops each one, or the container stops.`,
+            `父 process 已經死掉的 process 叫做<b>孤兒</b>（orphan）。核心不會停掉孤兒，而是幫它們換一個新的父 process：PID 1（在容器裡就是容器的第一個 process）。<mark>node 從頭到尾沒收到任何 signal，所以繼續跑</mark>：<code>ros2 node list</code> 還看得到它們，<code>ps</code> 顯示 PPID 是 1。這就是第 1 部分的謎題。它們會一直跑，直到有人一個一個停掉它們，或容器停止。`),
+    apply: s => { begin(s);
+      s.procs = s.procs.filter(p => p.pid !== 471);
+      [472, 474, 476].forEach(pid => { const p = find(s, pid); p.ppid = 1; p.orphan = true; });
+      p2(s, 'p', '# ros2 node list'); p2(s, 'e', '/driver'); p2(s, 'e', '/monitor');
+      p2(s, 'p', '# ps -e -o pid,ppid,cmd');
+      p2(s, '', '    472       1 python3 /code/fake_mcu.py');
+      p2(s, '', '    474       1 python3 /code/driver.py');
+      p2(s, '', '    476       1 python3 /code/monitor.py');
+      return { hot: ['p-472', 'p-474', 'p-476', 't2'], call: { who: 'os', act: 'new parent for 472, 474, 476: PID 1', ret: T('still running', '還在跑'), bad: true } }; } },
+
+  { part: C, title: T('Run 2: one terminal, one process group', '第二次執行：一個終端機，一個 process group'),
+    narr: T(`The same launch again, so new PIDs: the launcher is 704. One more fact matters now. The shell puts a command and every process it starts into one <b>process group</b>, and makes that group the terminal's <b>foreground group</b>: the one that gets what you type in T1, including Ctrl+C. <mark>The children are in the launcher's group</mark>, because they inherited it at fork.`,
+            `同一個 launch 再跑一次，所以 PID 都是新的：launcher 是 704。現在還有一件事很重要。shell 會把一個指令以及它啟動的所有 process 放進同一個 <b>process group</b>，並把這個 group 設成終端機的<b>前景 group</b>：你在 T1 打的東西（包括 Ctrl+C）都是給它的。<mark>子 process 也在 launcher 的 group 裡</mark>，因為 fork 時繼承了下來。`),
+    apply: s => { Object.assign(s, initialState()); s.ghosts = [];
+      s.procs = [proc(1, 0, T('PID 1 · the container\'s first process', 'PID 1 · 容器的第一個 process'), 'os'),
+                 proc(696, 1, 'bash', 'sh', { note: 'T1' }),
+                 proc(704, 696, 'ros2 launch robot.launch.py', 'b', { grpLead: true }),
+                 proc(705, 704, 'python3 fake_mcu.py', 'hw'), proc(707, 704, 'python3 driver.py', 'a'), proc(709, 704, 'python3 monitor.py', 'a')];
+      s.grp = true;
+      p1(s, 'p', '# ros2 launch robot.launch.py');
+      p1(s, '', '[INFO] [python3-1]: process started with pid [705]');
+      p1(s, '', '[INFO] [python3-2]: process started with pid [707]');
+      p1(s, '', '[INFO] [python3-3]: process started with pid [709]');
+      p1(s, '', '[python3-3] [INFO] [monitor]: ticks = 63');
+      begin(s);
+      return { hot: ['grp'] }; } },
+
+  { part: C, title: T(`Ctrl+C: ${actor('os', 'the kernel')} sends SIGINT to the whole group`, `Ctrl+C：${actor('os', '核心')}把 SIGINT 送給整個 group`),
+    narr: T(`Ctrl+C is not a key the program reads. The terminal driver in the kernel turns it into <b>SIGINT</b> ("interrupt") and sends it to <mark>every process in the foreground group at once</mark>: the launcher and all three children. Compare step 4, where one PID got one signal.`,
+            `Ctrl+C 不是程式讀到的按鍵。核心裡的終端機驅動程式把它變成 <b>SIGINT</b>（interrupt），並<mark>同時送給前景 group 裡的每一個 process</mark>：launcher 和三個子 process 全部。對照第 4 步：那時只有一個 PID 收到一個 signal。`),
+    apply: s => { begin(s); p1(s, 'e', '^C');
+      [704, 705, 707, 709].forEach(pid => { find(s, pid).tag = 'SIGINT'; });
+      s.kern = { sig: 'SIGINT', to: T('process group 704: 4 processes', 'process group 704：4 個 process'), note: T('Ctrl+C, from the terminal', 'Ctrl+C，來自終端機') };
+      return { hot: ['grp', 'kernel'], arrows: [['kernel', 'grp', 'int']],
+               call: { who: 'os', act: 'SIGINT → process group 704', note: T('every process in the group, at once', 'group 裡的每個 process，同時') } }; } },
+
+  { part: C, title: T(`Every process catches SIGINT and stops; ${actor('b', 'the launcher')} waits for them`, `每個 process 都接住 SIGINT 並停下；${actor('b', 'launcher')} 等它們結束`),
+    narr: T(`Each node catches SIGINT (rclpy turns it into a <code>KeyboardInterrupt</code>, hence the tracebacks) and exits. The launcher catches SIGINT too, but it does not exit at once: it <mark>waits for each child and reports how it ended</mark>. Exit code −2 means "ended by signal 2", which is SIGINT. The tracebacks are normal here and are cut from the log.`,
+            `每個 node 都接住 SIGINT（rclpy 把它變成 <code>KeyboardInterrupt</code>，所以會有 traceback），然後結束。launcher 也接住了 SIGINT，但它不會馬上結束，而是<mark>等每個子 process 結束，並回報它們怎麼結束的</mark>。exit code −2 的意思是「被 signal 2 結束」，也就是 SIGINT。這裡的 traceback 是正常的，log 裡省略了。`),
+    apply: s => { begin(s); s.kern = null;
+      p1(s, '', '[WARNING] [launch]: user interrupted with ctrl-c (SIGINT)');
+      p1(s, 'm', T('(tracebacks: KeyboardInterrupt, cut)', '（traceback：KeyboardInterrupt，省略）'));
+      p1(s, 'e', "[ERROR] [python3-1]: process has died [pid 705, exit code -2, cmd 'python3 /code/fake_mcu.py'].");
+      p1(s, 'e', "[ERROR] [python3-3]: process has died [pid 709, exit code -2, cmd 'python3 /code/monitor.py'].");
+      p1(s, 'e', "[ERROR] [python3-2]: process has died [pid 707, exit code -2, cmd 'python3 /code/driver.py'].");
+      [705, 707, 709].forEach(pid => { find(s, pid).dead = true; });
+      return { hot: ['t1', 'p-705', 'p-707', 'p-709'], call: { who: LAUNCHER, act: 'wait for each child', ret: T('3 × exit code −2', '3 × exit code −2') } }; } },
+
+  { part: C, title: T('Then the launcher exits, and nothing is left', '接著 launcher 結束，什麼都沒留下'),
+    narr: T(`With every child gone, the launcher exits and T1 gets its prompt back. <code>ros2 node list</code> is empty and <code>ps</code> finds nothing. <mark>The difference from run 1 is who got the signal</mark>: there, one process that didn't catch it; here, every process, each of which did.`,
+            `所有子 process 都結束後，launcher 也結束，T1 回到提示字元。<code>ros2 node list</code> 是空的，<code>ps</code> 什麼都找不到。<mark>跟第一次執行的差別在於誰收到 signal</mark>：第一次只有一個 process 收到，而且它沒接；這次每個 process 都收到，而且每個都接了。`),
+    apply: s => { begin(s); s.procs = s.procs.filter(p => p.pid < 704); s.grp = false; p1(s, 'p', '#');
+      p2(s, 'p', '# ros2 node list'); p2(s, 'm', T('(nothing)', '（什麼都沒有）'));
+      p2(s, 'p', '# ps -e -o pid,ppid,cmd | grep python3'); p2(s, 'm', T('(nothing)', '（什麼都沒有）'));
+      return { hot: ['t1', 't2'], call: { who: LAUNCHER, act: 'exit', ret: T('clean', '乾淨') } }; } },
+
+  { part: 'R', title: T('What you should have seen', '你應該看到的'),
+    narr: T(`<ul>
+      <li>Every node is a <b>process</b> with a PID and a parent. The launcher is the parent of the nodes it starts.</li>
+      <li><code>kill PID</code> asks the kernel to send <b>SIGTERM to one process</b>, not to its children.</li>
+      <li>A process either <b>catches</b> a signal or gets the <b>default action</b>. For SIGTERM that is: end now.</li>
+      <li>Humble's <code>ros2 launch</code> catches only SIGINT, so <code>kill</code> leaves its nodes <b>orphaned</b>, adopted by PID 1.</li>
+      <li><b>Ctrl+C</b> sends SIGINT to the whole <b>foreground process group</b>, so every node stops itself.</li>
+      <li>Already orphaned? Stop the nodes themselves: <code>kill</code> each PID, or <code>pkill -f</code> by name.</li>
+    </ul><p><a href="../index.html#signals">Back to the worksheet</a></p>`, `<ul>
+      <li>每個 node 都是有 PID 和父 process 的 <b>process</b>。launcher 是它啟動的 node 的父 process。</li>
+      <li><code>kill PID</code> 請核心送 <b>SIGTERM 給一個 process</b>，不會送給它的子 process。</li>
+      <li>process 要嘛<b>接住</b> signal，要嘛被執行<b>預設動作</b>。SIGTERM 的預設動作是：立刻結束。</li>
+      <li>Humble 的 <code>ros2 launch</code> 只接 SIGINT，所以 <code>kill</code> 會讓它的 node 變成<b>孤兒</b>，被 PID 1 收養。</li>
+      <li><b>Ctrl+C</b> 把 SIGINT 送給整個<b>前景 process group</b>，每個 node 都會自己停下。</li>
+      <li>已經變成孤兒了？直接停 node 本身：對每個 PID 下 <code>kill</code>，或用 <code>pkill -f</code> 依名稱停。</li>
+    </ul><p><a href="../index.html#signals">回到學習單</a></p>`),
+    apply: s => ({ hot: [] }) },
+];
+</script>
+</body>
+</html>

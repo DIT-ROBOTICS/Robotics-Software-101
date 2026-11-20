@@ -242,9 +242,23 @@ html.zh .goals li.deeper label::after { content: "延伸"; }
 html.zh .ws pre .hl::after { content: attr(data-note-zh); }
 html.zh .kicker, html.zh .ws h2 small, html.zh .case-h, html.zh .try-h, html.zh .map .mt, html.zh table.t th { letter-spacing: .06em; }
 
-/* ---------- course home ---------- */
-table.courses { width: 100%; max-width: 58rem; }
-table.courses td:first-child { white-space: nowrap; font-weight: 700; padding-right: 1.5rem; }
-.soon { font: .68rem var(--mono); text-transform: uppercase; letter-spacing: .08em; color: var(--muted); white-space: nowrap; }
-@media (max-width: 640px) { table.courses td:first-child { white-space: normal; } }
+/* ---------- course home: one card per course ---------- */
+.cgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(19rem, 1fr)); gap: 1rem; margin: 1rem 0 1.5rem; }
+.ccard { background: #fff; border: 1px solid var(--line); border-top: 3px solid var(--ink); border-radius: var(--r);
+         padding: .9rem 1.1rem 1rem; display: flex; flex-direction: column; gap: .45rem; }
+.ccard.ready { border-top-color: var(--sig); }
+.ccard.clinic { border-top-style: dashed; }
+.ccard .art { display: block; width: calc(100% + 2.2rem); height: auto; margin: -.9rem -1.1rem .2rem; background: var(--bg); border-bottom: 1px solid var(--line); border-radius: var(--r) var(--r) 0 0; }
+.ccard .cno { font: 700 .68rem var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+.ccard h3 { margin: 0; font-size: 1.2rem; letter-spacing: -.01em; }
+.ccard h3 a { color: var(--ink); text-decoration: none; }
+.ccard h3 a:hover { color: var(--sig-ink); text-decoration: underline; }
+.ccard .q { margin: 0; font-weight: 600; color: var(--sig-ink); line-height: 1.4; }
+.ccard p { margin: 0; font-size: .95rem; line-height: 1.5; }
+.ccard .sides { display: grid; grid-template-columns: auto 1fr; gap: .2rem .6rem; font-size: .85rem; color: var(--muted);
+                border-top: 1px dashed var(--line); padding-top: .5rem; margin-top: auto; }
+.ccard .sides b { font: 700 .62rem var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--ink); padding-top: .2rem; white-space: nowrap; }
+.ccard .st { font: .66rem var(--mono); text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+.ccard .st a { color: var(--sig-ink); font-weight: 700; }
+html.zh .ccard .cno, html.zh .ccard .sides b, html.zh .ccard .st { letter-spacing: .04em; }
 @media (max-width: 640px) { .ws { padding: 1rem 1rem 3rem; } .masthead { padding: 1.1rem 1.1rem .9rem; } .ws h1 { font-size: 2rem; } .ws h2 { font-size: 1.45rem; } }

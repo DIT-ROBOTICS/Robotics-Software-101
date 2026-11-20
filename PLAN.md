@@ -31,7 +31,8 @@ Every course below has the same five pieces:
 - **Through-line:** one question the whole session answers. Every Part moves it forward; if a
   Part doesn't, it belongs in Go deeper.
 - **Running example:** one small program or setup of our own that every Part comes back to.
-- **Core:** six Parts, about 3 hours. Part 1 is always a puzzle: something goes wrong in the
+- **Core:** six Parts, about 3 hours (OS‑1 has seven: it opens with a short computer-architecture
+  intro that every later course relies on). Part 1 is always a puzzle: something goes wrong in the
   running example, members guess why, and the rest of the session explains it. Puzzles stay
   candidates until they are reproduced in the container.
 - **Go deeper:** ideas that take longer to sink in, for after the session.
@@ -50,23 +51,27 @@ moment you try to stop it.
 run in the Humble container.
 
 **Core:**
-1. **Puzzle:** you "killed" the launch, but its nodes are still in `ros2 node list`. (Candidates:
-   `kill -9` on the launcher, or a closed terminal / dropped SSH session.)
-2. **A node is a process:** a program is a file on the SSD; running it makes a process in RAM.
+1. **Puzzle:** Ctrl+C is the normal way to stop a launch, but one day its terminal is out of
+   reach (a start-up script, a teammate's tmux, a dropped SSH session), so you `kill` it from
+   another terminal. The launch is gone, but its nodes are still in `ros2 node list`.
+2. **Inside the computer** (intro level): CPU, cores and registers; cache, RAM and SSD as one
+   hierarchy, with latencies measured on a real laptop (1.7 ns L1 to 65 µs SSD); the kernel as
+   the program that shares cores, RAM and devices. OS‑2 goes deeper.
+3. **A node is a process:** a program is a file on the SSD; running it makes a process in RAM.
    PID, parent, the process tree; fork + exec; `ps --forest`, `/proc`. A container's processes
    are ordinary processes with their own view: they show up in `ps` on the host.
-3. **Stopping a process:** signals. Ctrl+C = SIGINT, `docker stop` = SIGTERM then SIGKILL after
+4. **Stopping a process:** signals. Ctrl+C = SIGINT, `docker stop` = SIGTERM then SIGKILL after
    the grace period, a closed SSH session = SIGHUP, SIGKILL can't be caught. Why a launcher must
    pass signals on to its children, and what is left behind when it can't (orphans).
-4. **Daemons:** a process with no terminal that keeps running in the background. Keeping work
+5. **Daemons:** a process with no terminal that keeps running in the background. Keeping work
    alive after SSH drops (tmux, `nohup`); daemons members meet: the Docker daemon, `ros2 daemon`
    (stale node lists), an agent that owns a device (`micro_ros_agent`). How to find, inspect and
    stop one.
-5. **Who may touch this file** (kept simple): every file has an owner and a group; your process
+6. **Who may touch this file** (kept simple): every file has an owner and a group; your process
    runs as a user (`id`); read r and w in `ls -l`. Examples: a `build/` folder owned by root
    after building as root in a container (why compose files pass the user ID); `/dev/...` is a
    file, often a symlink with a friendly name; what a privileged container skips.
-6. **Code you didn't compile:** executable vs shared library, plugins loaded at runtime, `ldd`,
+7. **Code you didn't compile:** executable vs shared library, plugins loaded at runtime, `ldd`,
    "undefined symbol" / "plugin failed to load"; sourcing an overlay on top of an underlay, and
    why the wrong `setup.bash` loads the wrong version of a package.
 
@@ -89,9 +94,9 @@ single-threaded and then with a multi-threaded executor.
 **Core:**
 1. **Puzzle:** the node is fine with one thread. Switch to a multi-threaded executor "to make it
    faster" and a counter shared by two callbacks comes out wrong, or the node freezes.
-2. **Inside the computer:** the basics of computer architecture. CPU and registers, cache, RAM,
-   SSD: the memory hierarchy, with rough sizes and access times (a register vs a cache hit vs
-   RAM vs the SSD). What happens at this level when a program starts and runs. CPU vs GPU, and
+2. **Inside the computer:** builds on OS‑1's intro. What happens at this level when a program
+   starts and runs: instructions, the program counter, a function call and the stack; why data
+   layout and access patterns decide speed (cache lines, the pointer-chasing benchmark again). CPU vs GPU, and
    why a robot carries a Jetson-class computer.
 3. **Virtual memory:** every process gets its own address space; pages; why a bad pointer is a
    segfault in your process and not a corrupted neighbour. Shared memory between processes: how

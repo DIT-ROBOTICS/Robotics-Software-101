@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Walkthrough 1: A wait that never ends</title>
+<script src="../../assets/lang.js"></script>
 <link rel="stylesheet" href="../../assets/walk.css">
 <style>
   main { grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); }
@@ -20,18 +21,22 @@
   .srv { font-size: .92rem; }
   .srv.working { color: var(--b); font-weight: 700; }
   .srv.replied { color: var(--ok); font-weight: 700; }
+  /* the code panel takes the colour of the section: red while it shows the bug, green for the fix */
+  body[data-kind="bug"] #code > .ph { background: var(--bad-t); box-shadow: inset 4px 0 0 var(--bad); }
+  body[data-kind="fix"] #code > .ph { background: var(--ok-t); box-shadow: inset 4px 0 0 var(--ok); }
 </style>
 </head>
-<body class="walk" data-title="Walkthrough 1: A wait that never ends" data-sub="one thread, one service call" data-back="../index.html#reply">
+<body class="walk" data-title="Walkthrough 1: A wait that never ends" data-title-zh="逐步解說 1：等不到的回覆"
+      data-sub="one thread, one service call" data-sub-zh="一條執行緒、一次 service 呼叫" data-back="../index.html#reply">
 <script src="../../assets/walk.js"></script>
 
 <main>
   <section class="col">
-    <h2>The code <small>the line the thread is running is highlighted</small></h2>
+    <h2><span lang="en">The code</span><span lang="zh-Hant">程式碼</span> <small><span lang="en">the line the thread is running is highlighted</span><span lang="zh-Hant">執行緒正在跑的那一行會被標出來</span></small></h2>
     <div id="left"></div>
   </section>
   <section class="col">
-    <h2>Inside the node <small>what the executor is doing, and what is waiting</small></h2>
+    <h2><span lang="en">Inside the node</span><span lang="zh-Hant">node 裡面</span> <small><span lang="en">what the executor is doing, and what is waiting</span><span lang="zh-Hant">executor 在做什麼、誰在等</span></small></h2>
     <div id="right"></div>
   </section>
 </main>
@@ -91,15 +96,9 @@ const ASYNC = [
   [30, "    rclpy.spin(AsyncClient())"],
 ];
 
-const GUESSES = {
-  next: { q: 'The server replies at t = 5.0 s. What does <code>blocking_client</code> print next?',
-          choices: ['result: 3', 'heartbeat', 'nothing, ever', 'an error'], right: 2,
-          answer: 'nothing, ever: the node is deadlocked' },
-};
-
 function initialState() {
   return { mode: 'block', t: 0, thread: 'spin', fn: '', line: 27, ready: [], out: [], fresh: 0,
-           server: 'idle', guess: false, reveal: false };
+           server: 'idle' };
 }
 /* each step starts with begin(s): output and ready items added after it count as new in this step */
 function begin(s) { s.fresh = s.out.length; }
@@ -113,110 +112,143 @@ function renderPanels(s, H) {
     : listing('code', 'async_client.py', 'code/async_client.py', ASYNC, s.line);
 
   const TH = {
-    spin:  ['', 'waiting in <code>spin()</code> until something is ready'],
-    run:   ['run', `running <code>${s.fn}</code>`],
-    stuck: ['stuck', 'stuck in <code>call()</code>, waiting until the reply is handled'],
+    spin:  ['', T('waiting in <code>spin()</code> until something is ready', '在 <code>spin()</code> 裡等，直到有東西準備好')],
+    run:   ['run', T(`running <code>${s.fn}</code>`, `正在跑 <code>${s.fn}</code>`)],
+    stuck: ['stuck', T('stuck in <code>call()</code>, waiting until the reply is handled', '卡在 <code>call()</code> 裡，等回覆被處理')],
   }[s.thread];
-  const execBody = `<div class="clock">t = ${s.t.toFixed(1)} s<small>since the node started</small></div>
-    <div class="thread ${TH[0]}" id="thread"><b>the one thread</b>${TH[1]}</div>`;
+  const execBody = `<div class="clock">t = ${s.t.toFixed(1)} s<small>${T('since the node started', 'node 啟動後')}</small></div>
+    <div class="thread ${TH[0]}" id="thread"><b>${T('the one thread', '唯一的執行緒')}</b>${TH[1]}</div>`;
 
   const readyBody = s.ready.length
     ? s.ready.slice().reverse().map(r => `<div class="rd ${r.id === 'r-reply' ? 'reply' : ''} ${s.ghosts.includes(r.id) ? 'new' : ''}" id="${r.id}"><span>${r.label}</span><small>${r.note || ''}</small></div>`).join('')
-    : '<div class="empty">nothing is waiting</div>';
+    : `<div class="empty">${T('nothing is waiting', '沒有東西在等')}</div>`;
 
-  const SRV = { idle: ['', 'idle'], working: ['working', 'working on 1 + 2 (takes 2 s)'], replied: ['replied', 'replied 3'] }[s.server];
+  const SRV = {
+    idle:    ['', T('idle', '閒置')],
+    working: ['working', T('working on 1 + 2 (takes 2 s)', '正在算 1 + 2（要 2 秒）')],
+    replied: ['replied', T('replied 3', '回覆了 3')],
+  }[s.server];
 
+  // real output stays as printed; 'm' lines are our own comments, so they are bilingual HTML
   const lines = s.out.slice(-10).map(([t, who, text], i, arr) => {
     const isNew = s.out.length - arr.length + i >= s.fresh;
-    const name = who === 'a' || who === 'ok' ?`[${s.mode === 'block' ? 'blocking_client' : 'async_client'}]` : who === 'b' ? '[slow_server]' : '';
-    return `<div class="ln ${isNew ? 'fresh' : ''}"><span class="t">${t == null ? '' : t.toFixed(1)}</span><span class="${who}">${name} ${esc(text)}</span></div>`;
-  }).join('') || '<div class="ln"><span></span><span class="m">(no output yet)</span></div>';
+    const name = who === 'a' || who === 'ok' ? `[${s.mode === 'block' ? 'blocking_client' : 'async_client'}]` : who === 'b' ? '[slow_server]' : '';
+    return `<div class="ln ${isNew ? 'fresh' : ''}"><span class="t">${t == null ? '' : t.toFixed(1)}</span><span class="${who}">${name} ${who === 'm' ? text : esc(text)}</span></div>`;
+  }).join('') || `<div class="ln"><span></span><span class="m">${T('(no output yet)', '（還沒有輸出）')}</span></div>`;
 
   $('right').innerHTML =
-    (s.guess ? guessCard('next', s.reveal) : '') +
-    panel('exec', `${actor('exec', 'Executor')}`, 'SingleThreadedExecutor', execBody) +
-    panel('readyp', 'Ready, waiting for the thread', 'timers, messages, replies', readyBody) +
-    panel('server', `${actor('b', 'slow_server')}`, 'another process', `<div class="srv ${SRV[0]}" id="srv">${SRV[1]}</div>`) +
+    panel('exec', actor('exec', 'Executor'), 'SingleThreadedExecutor', execBody) +
+    panel('readyp', T('Ready, waiting for the thread', '準備好了，等執行緒來跑'), T('timers, messages, replies', 'timer、message、回覆'), readyBody) +
+    panel('server', actor('b', 'slow_server'), T('another process', '另一個 process'), `<div class="srv ${SRV[0]}" id="srv">${SRV[1]}</div>`) +
     `<div class="term" id="term">${lines}</div>`;
 }
 
 /* ---------- steps ---------- */
-const A = 'A · The loop works', B = 'B · A wait that never ends', C = "C · Fix 1: don't wait";
-const EXEC = actor('exec', 'The executor'), THREAD = actor('exec', 'The thread');
+/* The sections of the story. kind colours the section bar (see walk.js): 'before' is the
+   normal run, before the bug shows up. The bug is in the code from the start. */
+const PARTS = {
+  A: { title: T('So far, so good', '目前看起來沒事'), kind: 'before',
+       intro: T("One thread runs every callback of the node, one at a time. The bug is already in the code; it just hasn't shown up yet.",
+                '一條執行緒輪流跑 node 的每個 callback。bug 其實已經在程式碼裡，只是還沒發作。') },
+  B: { title: T('A wait that never ends', '等不到的回覆'), kind: 'bug',
+       intro: T('<code>blocking_client.py</code> waits for a reply inside a callback.', '<code>blocking_client.py</code> 在 callback 裡等回覆。') },
+  C: { title: T("Fix 1: don't wait", '修法 1：不要等'), kind: 'fix',
+       intro: T('Same node, same moment (t = 3.0 s), new code: <code>async_client.py</code> uses <code>call_async()</code> instead of <code>call()</code>.',
+                '同一個 node、同一個時刻（t = 3.0 s），換一份程式碼：<code>async_client.py</code> 用 <code>call_async()</code> 取代 <code>call()</code>。') },
+  R: { title: T('What you should have seen', '你應該看到的'), kind: 'recap' },
+};
+const A = 'A', B = 'B', C = 'C';
 
 const STEPS = [
-  { part: A, title: `${EXEC} starts: one thread, waiting for work`,
-    narr: `<code>rclpy.spin()</code> creates a <b>SingleThreadedExecutor</b> and gives it the node. The executor owns <mark>exactly one thread</mark>, and that thread does one job, forever: wait until a timer, a message or a reply is ready, run its callback, then wait again. Nothing is ready yet, so it waits.`,
+  { part: A, title: T(`${actor('exec', 'The executor')} starts: one thread, waiting for work`, `${actor('exec', 'executor')} 啟動：一條執行緒，等著工作`),
+    narr: T(`<code>rclpy.spin()</code> creates a <b>SingleThreadedExecutor</b> and gives it the node. The executor owns <mark>exactly one thread</mark>, and that thread does one job, forever: wait until a timer, a message or a reply is ready, run its callback, then wait again. Nothing is ready yet, so it waits.`,
+            `<code>rclpy.spin()</code> 會建立一個 <b>SingleThreadedExecutor</b>，把 node 交給它。這個 executor <mark>只有一條執行緒</mark>，而這條執行緒永遠只做一件事：等到某個 timer、message 或回覆準備好，跑它的 callback，然後再回去等。現在什麼都還沒準備好，所以它在等。`),
     apply: s => { begin(s); s.t = 0; s.thread = 'spin'; s.line = 27;
-      return { hot: ['thread'], call: { who: 'exec', act: 'rclpy.spin(BlockingClient())', note: 'one thread that waits, runs a callback, and waits again' } }; } },
+      return { hot: ['thread'], call: { who: 'exec', act: 'rclpy.spin(BlockingClient())', note: T('one thread that waits, runs a callback, and waits again', '一條執行緒：等、跑一個 callback、再等') } }; } },
 
-  { part: A, title: `t = 0.5 s: the heartbeat timer is ready, and ${THREAD} runs it`,
-    narr: `The heartbeat timer comes due every 0.5 s. The thread runs <code>heartbeat()</code> from start to finish, which prints one line, and goes straight back to waiting. A <b>callback</b> is just this: a function you gave ROS, for ROS to call later.`,
+  { part: A, title: T(`t = 0.5 s: the heartbeat timer is ready, and ${actor('exec', 'the thread')} runs it`, `t = 0.5 s：heartbeat timer 到了，${actor('exec', '執行緒')}去跑它`),
+    narr: T(`The heartbeat timer comes due every 0.5 s. The thread runs <code>heartbeat()</code> from start to finish, which prints one line, and goes straight back to waiting. A <b>callback</b> is just this: a function you gave ROS, for ROS to call later.`,
+            `heartbeat timer 每 0.5 秒到一次。執行緒把 <code>heartbeat()</code> 從頭跑到尾（印出一行），然後馬上回去等。<b>callback</b> 就是這樣：你交給 ROS 的一個函式，讓 ROS 之後幫你呼叫。`),
     apply: s => { begin(s); s.t = 0.5; s.thread = 'run'; s.fn = 'heartbeat()'; s.line = [21, 22]; say(s, 0.5, 'a', 'heartbeat');
-      return { hot: ['thread'], call: { who: 'exec', act: 'heartbeat()', ret: 'returns', note: 'prints one line, then back to waiting' } }; } },
+      return { hot: ['thread'], call: { who: 'exec', act: 'heartbeat()', ret: 'returns', note: T('prints one line, then back to waiting', '印一行，然後回去等') } }; } },
 
-  { part: A, title: `t = 3.0 s: two timers are ready at once`,
-    narr: `The same thing happened at 1.0, 1.5, 2.0 and 2.5 s. At 3.0 s, both <code>ask</code> and <code>heartbeat</code> are due. <mark>One thread runs one callback at a time</mark>, so <code>ask()</code> runs first and the heartbeat waits its turn. <code>ask()</code> prints <code>calling...</code>.`,
+  { part: A, title: T('t = 3.0 s: two timers are ready at once', 't = 3.0 s：兩個 timer 同時到了'),
+    narr: T(`The same thing happened at 1.0, 1.5, 2.0 and 2.5 s. At 3.0 s, both <code>ask</code> and <code>heartbeat</code> are due. <mark>One thread runs one callback at a time</mark>, so <code>ask()</code> runs first and the heartbeat waits its turn. <code>ask()</code> prints <code>calling...</code>.`,
+            `1.0、1.5、2.0、2.5 秒時也是一樣。到了 3.0 秒，<code>ask</code> 和 <code>heartbeat</code> 同時到期。<mark>一條執行緒一次只能跑一個 callback</mark>，所以先跑 <code>ask()</code>，heartbeat 排隊等。<code>ask()</code> 印出 <code>calling...</code>。`),
     apply: s => { begin(s); [1.0, 1.5, 2.0, 2.5].forEach(t => say(s, t, 'a', 'heartbeat'));
       s.t = 3.0; s.thread = 'run'; s.fn = 'ask()'; s.line = 17; say(s, 3.0, 'a', 'calling...');
-      ready(s, 'r-hb', 'heartbeat timer', 'due at 3.0 s');
-      return { hot: ['thread', 'r-hb'], call: { who: 'exec', act: 'ask()', note: 'the heartbeat is due too, and waits its turn' } }; } },
+      ready(s, 'r-hb', 'heartbeat timer', T('due at 3.0 s', '3.0 秒到期'));
+      return { hot: ['thread', 'r-hb'], call: { who: 'exec', act: 'ask()', note: T('the heartbeat is due too, and waits its turn', 'heartbeat 也到了，排隊等') } }; } },
 
-  { part: B, title: `${THREAD} calls <code>call()</code>, and starts to wait`,
-    narr: `<code>call()</code> does two things. It sends the request to <code>slow_server</code>, which starts working on it. Then it makes <mark>the thread that called it</mark> wait until the reply has been handled. That thread is the executor's only thread. The server will reply at 5.0 s. Make a guess before you go on.`,
-    apply: s => { begin(s); s.thread = 'stuck'; s.line = 18; s.server = 'working'; s.guess = true;
+  { part: B, title: T(`${actor('exec', 'The thread')} calls <code>call()</code>, and starts to wait`, `${actor('exec', '執行緒')}呼叫 <code>call()</code>，開始等`),
+    narr: T(`<code>call()</code> does two things. It sends the request to <code>slow_server</code>, which starts working on it. Then it makes <mark>the thread that called it</mark> wait until the reply has been handled. That thread is the executor's only thread. The server will reply at 5.0 s.`,
+            `<code>call()</code> 做兩件事。先把 request 送給 <code>slow_server</code>，server 開始處理。接著讓<mark>呼叫它的那條執行緒</mark>停下來等，直到回覆被處理完。那條執行緒就是 executor 唯一的執行緒。server 會在 5.0 秒回覆。`),
+    apply: s => { begin(s); s.thread = 'stuck'; s.line = 18; s.server = 'working';
       say(s, 3.0, 'b', 'got 1 + 2, working...');
-      return { hot: ['thread', 'guess-next'], 
-               call: { who: 'exec', act: 'self.client.call(AddTwoInts.Request(a=1, b=2))', note: 'sends the request, then waits on this thread' } }; } },
+      return { hot: ['thread'],
+               call: { who: 'exec', act: 'self.client.call(AddTwoInts.Request(a=1, b=2))', note: T('sends the request, then waits on this thread', '送出 request，然後在這條執行緒上等') } }; } },
 
-  { part: B, title: 't = 3.0 to 5.0 s: the heartbeat is due, and nobody runs it',
-    narr: `The heartbeat timer comes due again at 3.5, 4.0 and 4.5 s. It just stays ready. The only thread that could run it is stuck in <code>call()</code>, so <mark>no heartbeat is printed</mark>, even though the heartbeat has nothing to do with the service.`,
-    apply: s => { begin(s); s.t = 4.5; s.ready[0].note = 'due since 3.0 s, still waiting';
-      return { hot: ['r-hb', 'thread'], call: { who: 'exec', act: 'still inside call()', note: 'the server is still working' } }; } },
+  { part: B, title: T('t = 3.0 to 5.0 s: the heartbeat is due, and nobody runs it', 't = 3.0 到 5.0 s：heartbeat 到期了，卻沒人跑它'),
+    narr: T(`The heartbeat timer comes due again at 3.5, 4.0 and 4.5 s. It just stays ready. The only thread that could run it is stuck in <code>call()</code>, so <mark>no heartbeat is printed</mark>, even though the heartbeat has nothing to do with the service.`,
+            `heartbeat timer 在 3.5、4.0、4.5 秒又到期，但只能一直待在等待區。唯一能跑它的執行緒卡在 <code>call()</code> 裡，所以<mark>一行 heartbeat 都沒印出來</mark>，雖然 heartbeat 跟 service 一點關係都沒有。`),
+    apply: s => { begin(s); s.t = 4.5; s.ready[0].note = T('due since 3.0 s, still waiting', '3.0 秒就到期，還在等');
+      return { hot: ['r-hb', 'thread'], call: { who: 'exec', act: 'call()', note: T('still inside; the server is still working', '還卡在裡面；server 還在處理') } }; } },
 
-  { part: B, title: 't = 5.0 s: the reply arrives, and it is work for the executor',
-    narr: `The server replies, and DDS delivers the reply to the client's process. But nothing in the client has looked at it yet. <mark>Handling a reply is a callback like any other</mark>: the executor's thread must take it from the ready list and run it. Only then is the request marked done, and only that would wake up the waiting <code>call()</code>.`,
+  { part: B, title: T('t = 5.0 s: the reply arrives, and it is work for the executor', 't = 5.0 s：回覆到了，而處理它是 executor 的工作'),
+    narr: T(`The server replies, and DDS delivers the reply to the client's process. But nothing in the client has looked at it yet. <mark>Handling a reply is a callback like any other</mark>: the executor's thread must take it from the ready list and run it. Only then is the request marked done, and only that would wake up the waiting <code>call()</code>.`,
+            `server 回覆了，DDS 把回覆送進 client 的 process。但 client 裡還沒有人去看它。<mark>處理回覆跟其他 callback 一樣</mark>：要由 executor 的執行緒從等待區拿出來跑。跑完之後 request 才算完成，等在 <code>call()</code> 裡的執行緒也才會被叫醒。`),
     apply: s => { begin(s); s.t = 5.0; s.server = 'replied'; say(s, 5.0, 'b', 'replied 3');
-      ready(s, 'r-reply', 'reply from add_two_ints', 'arrived at 5.0 s');
-      return { hot: ['r-reply'], arrows: [['srv', 'r-reply', 'mw', 'reply 3']],
-               call: { who: 'mw', act: 'reply 3 reaches blocking_client', note: 'now the executor must handle it' } }; } },
+      ready(s, 'r-reply', T('reply from add_two_ints', 'add_two_ints 的回覆'), T('arrived at 5.0 s', '5.0 秒到達'));
+      return { hot: ['r-reply'], arrows: [['srv', 'r-reply', 'mw', ['reply 3', '回覆 3']]],
+               call: { who: 'mw', act: 'reply 3 → blocking_client', note: T('now the executor must handle it', '現在要靠 executor 處理') } }; } },
 
-  { part: B, title: 'Deadlock: each one waits for the other',
-    narr: `The thread waits until the reply is handled. The reply waits until the thread is free to handle it. Neither can go first, so both wait forever. This is a <b>deadlock</b>. <mark>Every callback of this node now waits for a thread that will never come back</mark>, and that is why the heartbeat stopped too. A faster server would not help: a reply at 3.1 s would wait in the same list.`,
-    apply: s => { begin(s); s.reveal = true; say(s, null, 'm', '(nothing more, ever)');
-      return { hot: ['thread', 'r-reply', 'guess-next'], arrows: [['thread', 'r-reply', 'wait', 'waits for']],
-               call: { who: 'exec', act: 'event.wait()', ret: 'never returns', bad: true, note: 'inside call(): see Part 5 of the worksheet' } }; } },
+  { part: B, title: T('Deadlock: each one waits for the other', '死結：兩邊都在等對方'),
+    narr: T(`The thread waits until the reply is handled. The reply waits until the thread is free to handle it. Neither can go first, so both wait forever. This is a <b>deadlock</b>. <mark>Every callback of this node now waits for a thread that will never come back</mark>, and that is why the heartbeat stopped too. A faster server would not help: a reply at 3.1 s would wait in the same list.`,
+            `執行緒在等回覆被處理，回覆在等執行緒有空來處理它。誰都沒辦法先動，只好永遠等下去。這就是<b>死結</b>（deadlock）。<mark>這個 node 的每個 callback 都在等一條再也回不來的執行緒</mark>，所以 heartbeat 也停了。server 再快也沒用：就算 3.1 秒就回覆，也只是在同一個等待區裡等。`),
+    apply: s => { begin(s); say(s, null, 'm', T('(nothing more, ever)', '（之後什麼都沒有）'));
+      return { hot: ['thread', 'r-reply'], arrows: [['thread', 'r-reply', 'wait', ['waits for', '等待']]],
+               call: { who: 'exec', act: 'event.wait()', ret: T('never returns', '永遠不會 return'), bad: true, note: T('inside call(): see Part 5 of the worksheet', '在 call() 裡面：見學習單第 5 部分') } }; } },
 
-  { part: C, title: 'Back to t = 3.0 s: <code>call_async()</code> sends the request and returns at once',
-    narr: `Now the same moment in <code>async_client.py</code>. <code>call_async()</code> sends the same request but does not wait. It returns at once with a <b>future</b>, an object that will hold the reply later. <code>add_done_callback()</code> says which function to run when the reply is in. Then <code>ask()</code> returns, and <mark>the thread is free again</mark>.`,
+  { part: C, title: T('Back to t = 3.0 s: <code>call_async()</code> sends the request and returns at once', '回到 t = 3.0 s：<code>call_async()</code> 送出 request 後馬上 return'),
+    narr: T(`Now the same moment in <code>async_client.py</code>. <code>call_async()</code> sends the same request but does not wait. It returns at once with a <b>future</b>, an object that will hold the reply later. <code>add_done_callback()</code> says which function to run when the reply is in. Then <code>ask()</code> returns, and <mark>the thread is free again</mark>.`,
+            `現在換成 <code>async_client.py</code>，看同一個時刻。<code>call_async()</code> 一樣送出 request，但不等。它馬上 return 一個 <b>future</b>：一個之後會裝著回覆的物件。<code>add_done_callback()</code> 指定回覆到了要跑哪個函式。接著 <code>ask()</code> return，<mark>執行緒又空出來了</mark>。`),
     apply: s => { Object.assign(s, initialState()); s.ghosts = []; s.mode = 'async';
       [0.5, 1.0, 1.5, 2.0, 2.5].forEach(t => say(s, t, 'a', 'heartbeat')); say(s, 3.0, 'a', 'calling...'); begin(s);
       s.t = 3.0; s.thread = 'run'; s.fn = 'ask()'; s.line = [18, 19]; s.server = 'working'; say(s, 3.0, 'b', 'got 1 + 2, working...');
-      return { hot: ['thread'], 
-               call: { who: 'exec', act: 'self.client.call_async(...)', ret: '→ a future', note: 'returns at once' } }; } },
+      return { hot: ['thread'],
+               call: { who: 'exec', act: 'self.client.call_async(...)', ret: T('→ a future', '→ 一個 future'), note: T('returns at once', '馬上 return') } }; } },
 
-  { part: C, title: 't = 3.0 to 4.5 s: the heartbeat keeps going',
-    narr: `While the server works, the thread is back in <code>spin()</code>, and it runs the heartbeat every 0.5 s as before. Compare this with step 5, where the same timer was stuck in the ready list.`,
+  { part: C, title: T('t = 3.0 to 4.5 s: the heartbeat keeps going', 't = 3.0 到 4.5 s：heartbeat 照常'),
+    narr: T(`While the server works, the thread is back in <code>spin()</code>, and it runs the heartbeat every 0.5 s as before. Compare this with step 5, where the same timer was stuck in the ready list.`,
+            `server 處理的這段時間，執行緒回到 <code>spin()</code>，跟之前一樣每 0.5 秒跑一次 heartbeat。對照第 5 步：同一個 timer 那時卡在等待區。`),
     apply: s => { begin(s); [3.0, 3.5, 4.0, 4.5].forEach(t => say(s, t, 'a', 'heartbeat'));
       s.t = 4.5; s.thread = 'run'; s.fn = 'heartbeat()'; s.line = [24, 25];
-      return { hot: ['term'], call: { who: 'exec', act: 'heartbeat()', note: 'every 0.5 s, while the server works' } }; } },
+      return { hot: ['term'], call: { who: 'exec', act: 'heartbeat()', note: T('every 0.5 s, while the server works', 'server 處理時，每 0.5 秒一次') } }; } },
 
-  { part: C, title: 't = 5.0 s: the reply is handled, and <code>on_reply()</code> runs',
-    narr: `The reply arrives and becomes ready. The thread is free, so it handles the reply right away: the future is done, and the thread runs <code>on_reply()</code>, which prints <code>result: 3</code>. <mark>No callback ever waits for another</mark>, so nothing can deadlock.`,
+  { part: C, title: T('t = 5.0 s: the reply is handled, and <code>on_reply()</code> runs', 't = 5.0 s：回覆被處理，<code>on_reply()</code> 執行'),
+    narr: T(`The reply arrives and becomes ready. The thread is free, so it handles the reply right away: the future is done, and the thread runs <code>on_reply()</code>, which prints <code>result: 3</code>. <mark>No callback ever waits for another</mark>, so nothing can deadlock.`,
+            `回覆到了，進入等待區。執行緒有空，馬上處理它：future 完成，接著跑 <code>on_reply()</code>，印出 <code>result: 3</code>。<mark>沒有任何 callback 在等另一個 callback</mark>，所以不會死結。`),
     apply: s => { begin(s); s.t = 5.0; say(s, 5.0, 'a', 'heartbeat'); s.server = 'replied'; say(s, 5.0, 'b', 'replied 3');
       s.thread = 'run'; s.fn = 'on_reply()'; s.line = [21, 22]; say(s, 5.0, 'ok', 'result: 3');
       return { hot: ['thread', 'term'],
                call: { who: 'exec', act: 'on_reply(future)', ret: 'result: 3' } }; } },
 
-  { part: 'Recap', title: 'What you should have seen',
-    narr: `<ul>
+  { part: 'R', title: T('What you should have seen', '你應該看到的'),
+    narr: T(`<ul>
       <li>A SingleThreadedExecutor has <b>one thread</b>. It runs one callback at a time, from start to finish.</li>
       <li>While a callback runs, <b>everything else in the node waits</b>: timers, messages, replies.</li>
       <li><code>call()</code> makes the thread that called it <b>wait</b> until the reply is handled.</li>
       <li><b>Handling the reply is executor work.</b> Inside a callback, no thread is left to do it: deadlock.</li>
       <li><code>call_async()</code> with a done callback <b>never waits</b>, so the thread stays free.</li>
       <li>The worksheet shows a second fix: give the executor more threads (Part 4).</li>
-    </ul><p><a href="../index.html#fixes">Back to the worksheet</a></p>`,
+    </ul><p><a href="../index.html#fixes">Back to the worksheet</a></p>`, `<ul>
+      <li>SingleThreadedExecutor 只有<b>一條執行緒</b>，一次跑一個 callback，從頭跑到尾。</li>
+      <li>callback 在跑的時候，<b>node 裡的其他東西都在等</b>：timer、message、回覆。</li>
+      <li><code>call()</code> 會讓呼叫它的執行緒<b>停下來等</b>，直到回覆被處理。</li>
+      <li><b>處理回覆是 executor 的工作。</b>在 callback 裡呼叫 <code>call()</code>，就沒有執行緒能處理它：死結。</li>
+      <li><code>call_async()</code> 加上 done callback <b>從不等待</b>，執行緒一直有空。</li>
+      <li>學習單裡還有第二種修法：給 executor 更多執行緒（第 4 部分）。</li>
+    </ul><p><a href="../index.html#fixes">回到學習單</a></p>`),
     apply: s => ({ hot: [] }) },
 ];
 </script>

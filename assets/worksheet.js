@@ -1,9 +1,10 @@
 // worksheet.js: shared behavior for every DIT worksheet page. No build step, no dependencies.
+//  - Language: lang.js (loaded in <head>) does the work; this adds the switch button, and the L key.
 //  - Session map: <nav class="map" data-home="../index.html"></nav> is filled from the h2s that have
 //    an id. On a wide screen it is a rail on the left, and it marks the Part the reader is in.
-//    Kicker and time come from the h2's <small>, e.g. <small>Part 2 · 20 min</small>.
-//    An h2 with class "deeper" is listed as Go deeper and not counted in the session time;
-//    an h2 with data-map="no" (credits) is left out.
+//    The number comes from the h2's <small>Part 2</small>. No times on the page: the timetable is
+//    for the presenter only, in the course's SESSION.md. An h2 with class "deeper" is marked Go
+//    deeper; an h2 with data-map="no" (credits) is left out.
 //  - "Think first" cards: <div class="quiz"><button>question<span class="ans">answer</span></button></div>
 //  - Take home: <ul class="goals"><li>I can ...</li></ul>; ticks are saved in this browser only.
 //  - Code: <pre data-lang="py|cpp|sh"> gets light syntax colouring; <span class="hl" data-note="...">
@@ -14,28 +15,30 @@
     set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} },
   };
 
+  /* ---------- the language switch (lang.js) ---------- */
+  if (window.DIT && DIT.langButton) document.body.append(DIT.langButton('float'));
+  document.addEventListener('keydown', ev => {
+    if ((ev.key === 'l' || ev.key === 'L') && !ev.ctrlKey && !ev.metaKey && !ev.altKey && !/^(input|textarea|select)$/i.test(ev.target.tagName) && window.DIT) DIT.toggleLang();
+  });
+  const T2 = (en, zh) => (typeof T === 'function' ? T(en, zh) : en);
+
   /* ---------- session map ---------- */
+  // No times on the page: the timetable is the presenter's (SESSION.md in the course folder).
   document.querySelectorAll('nav.map').forEach(nav => {
     const rows = [], heads = [];
-    let total = 0;
     document.querySelectorAll('.ws h2[id]').forEach(h => {
       if (h.dataset.map === 'no') return;
-      const small = h.querySelector('small');
-      const kick = small ? small.textContent.trim() : '';
-      const [mk, tm] = kick.split('·').map(x => (x || '').trim());
-      const title = [...h.childNodes].filter(n => n !== small).map(n => n.textContent).join('').trim();
-      const deeper = h.classList.contains('deeper');
-      const min = parseInt(tm, 10);
-      if (!deeper && min) total += min;
-      const part = /^Part\s+(\d+)/i.exec(mk);
+      const c = h.cloneNode(true); const sm = c.querySelector('small'); if (sm) sm.remove();
+      const kick = h.querySelector('small') ? h.querySelector('small').textContent : '';
+      const part = /Part\s+(\d+)/i.exec(kick);
       const no = part ? part[1].padStart(2, '0') : '–';
+      const deeper = h.classList.contains('deeper');
       heads.push(h);
-      rows.push(`<li class="${deeper ? 'deeper' : ''}"><a href="#${h.id}"><span class="mk">${no}</span><span>${title}</span><span class="tm">${tm || ''}</span></a></li>`);
+      rows.push(`<li class="${deeper ? 'deeper' : ''}"><a href="#${h.id}"><span class="mk">${no}</span><span>${c.innerHTML.trim()}</span><span class="tm">${deeper ? T2('Go deeper', '延伸') : ''}</span></a></li>`);
     });
-    const time = total >= 60 ? Math.floor(total / 60) + ' h' + (total % 60 ? ' ' + total % 60 + ' min' : '') : total + ' min';
-    const foot = total ? `<div class="total">Core parts: <b>${time}</b><br>not counting breaks and questions</div>` : '';
     const home = nav.dataset.home ? `<a class="brand" href="${nav.dataset.home}"><b>DIT</b><span>Robotics<br>Software courses</span></a>` : '';
-    nav.innerHTML = `${home}<div class="mt">${nav.dataset.label || 'Session map'}</div><ol>${rows.join('')}</ol>${foot}`;
+    const label = nav.dataset.label ? T2(nav.dataset.label, nav.dataset.labelZh || nav.dataset.label) : T2('Session map', '課程地圖');
+    nav.innerHTML = `${home}<div class="mt">${label}</div><ol>${rows.join('')}</ol>`;
     document.body.classList.add('has-rail');
     // mark the Part the reader is in
     const items = [...nav.querySelectorAll('li')];
@@ -75,7 +78,7 @@
       bar.firstChild.style.width = (100 * on / boxes.length) + '%';
     }
     const p = document.createElement('p');
-    p.innerHTML = '<button type="button" class="goalreset">Reset checklist</button> <span class="muted" style="font-size:.88rem">Ticks are saved only in this browser.</span>';
+    p.innerHTML = `<button type="button" class="goalreset">${T2('Reset checklist', '清除勾選')}</button> <span class="muted" style="font-size:.88rem">${T2('Ticks are saved only in this browser.', '勾選只存在這個瀏覽器裡。')}</span>`;
     p.querySelector('button').addEventListener('click', () => { saved = {}; store.set(key, saved); boxes.forEach(b => { b.checked = false; }); paint(); });
     list.after(p);
     paint();

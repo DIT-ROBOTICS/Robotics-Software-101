@@ -21,12 +21,16 @@
   --mw: #7b3fe4;   --mw-t: #efe7fd;    /* middleware: DDS, the network */
   --os: #6b6f76;   --os-t: #ecedef;    /* the Linux kernel */
   --hw: #8a6500;   --hw-t: #f6edd0;    /* hardware: MCU, sensors, motors */
-  --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", Helvetica, Arial, sans-serif;
+  --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", Helvetica, Arial, "PingFang TC", "Noto Sans TC", "Noto Sans CJK TC", "Microsoft JhengHei", sans-serif;
   --mono: ui-monospace, "JetBrains Mono", "SF Mono", "Cascadia Code", Menlo, Consolas, "DejaVu Sans Mono", monospace;
   --r: 6px;
   font-size: 17px;
 }
 * { box-sizing: border-box; }
+
+/* ---------- English / 中文 (lang.js) ---------- */
+html.zh [lang="en"]:not(html), html:not(.zh) [lang="zh-Hant"] { display: none !important; }
+html.zh body { line-height: 1.75; }
 html { scroll-behavior: smooth; }
 @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
 body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--sans); line-height: 1.6; }
@@ -76,6 +80,7 @@ body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--s
 .map li.cur .mk { color: var(--sig-bright); }
 .map li.deeper a { color: #b9c5d3; }
 .map li.deeper .tm { color: #b9aeff; }
+.map code { background: rgba(255,255,255,.12); color: inherit; padding: 0 .25em; }
 .map .total { font-size: .76rem; color: #9fb0c2; border-top: 1px solid rgba(255,255,255,.15); margin: .7rem .5rem 0; padding-top: .6rem; line-height: 1.45; }
 .map .total b { color: #fff; font-family: var(--mono); }
 @media (min-width: 1100px) {
@@ -83,6 +88,11 @@ body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--s
   body.has-rail .map { position: fixed; left: 0; top: 0; bottom: 0; width: 17.5rem; max-width: none; margin: 0; border-radius: 0;
                        overflow-y: auto; padding: 1.4rem .9rem; }
   body.has-rail .map .brand { display: flex; padding-left: .5rem; }
+  /* the language switch sits at the bottom of the rail, out of the content's way */
+  body.has-rail .langswitch.float { top: auto; right: auto; left: .9rem; bottom: .9rem; background: transparent; color: #e8eef5;
+    border-color: rgba(255,255,255,.4); box-shadow: none; }
+  body.has-rail .langswitch.float:hover { background: rgba(255,255,255,.1); }
+  body.has-rail .map { padding-bottom: 4rem; }
 }
 
 /* ---------- parts ---------- */
@@ -217,6 +227,20 @@ details.deeper pre { background: #fff; }
 /* ---------- footer ---------- */
 .credits { font-size: .82rem; color: var(--muted); }
 footer.ws-foot { margin-top: 3.5rem; padding-top: 1rem; border-top: 1px solid var(--line); font: .72rem var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+
+/* the language switch: top right, always in reach */
+.langswitch.float { position: fixed; top: .8rem; right: .9rem; z-index: 20; font: 700 .85rem var(--sans); color: var(--ink);
+  background: #fff; border: 1px solid var(--ink); border-radius: 4px; padding: .35rem .8rem; cursor: pointer; box-shadow: 0 2px 8px rgba(13,27,42,.12); }
+.langswitch.float:hover { background: var(--sig-t); }
+.langswitch.float:focus-visible { outline: 3px solid var(--sig); outline-offset: 2px; }
+@media (max-width: 1099px) { .ws { padding-top: 3.4rem; } }
+/* labels drawn by CSS, in Chinese */
+html.zh .think::before { content: "讀下去之前"; }
+html.zh .quiz button::before { content: "? 先想想，再點開"; }
+html.zh .quiz button.open::before { content: "答案"; }
+html.zh .goals li.deeper label::after { content: "延伸"; }
+html.zh .ws pre .hl::after { content: attr(data-note-zh); }
+html.zh .kicker, html.zh .ws h2 small, html.zh .case-h, html.zh .try-h, html.zh .map .mt, html.zh table.t th { letter-spacing: .06em; }
 
 /* ---------- course home ---------- */
 table.courses { width: 100%; max-width: 58rem; }

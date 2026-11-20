@@ -4,8 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <!-- TEMPLATE. Copy this folder to start a course: courses/<course>/. Keep the structure, replace the
-     content. Read courses/README.md first: it explains each box and when to use it. -->
+     content. Read courses/README.md first: it explains each box and when to use it.
+     Every text a reader sees is written twice, English then Chinese, next to each other:
+       <p lang="en">...</p> <p lang="zh-Hant">...</p>
+     Code, terminal output and numbers are written once. No times on this page: they are in
+     SESSION.md, for the presenter. -->
 <title>Waiting inside a callback</title>
+<script src="../assets/lang.js"></script>
 <link rel="stylesheet" href="../assets/worksheet.css">
 </head>
 <body>
@@ -13,37 +18,42 @@
 
 <div class="masthead">
   <div>
-    <div class="kicker">DIT Robotics · Software courses · Example worksheet</div>
-    <h1>Waiting inside a callback</h1>
-    <p class="lead">Every ROS 2 node is a program, and inside it one part decides which piece of your code runs next: the <span class="who exec">executor</span>. In this session we freeze a node on purpose, find out exactly why it froze, and fix it in two ways. On the way you build a picture of the executor that explains a whole family of "my node just stopped" bugs.</p>
-    <p class="howto"><b>How to use this page.</b> The numbered Parts are what we do together in the session, with a rough time for each. Boxes and Parts marked <b>Go deeper</b> hold ideas that take longer to sink in. Skip them on the first pass. Come back to them after the session, or the day you meet the bug for real.</p>
+    <div class="kicker"><span lang="en">DIT Robotics · Software courses · Example worksheet</span><span lang="zh-Hant">DIT Robotics · 軟體課程 · 範例學習單</span></div>
+    <h1><span lang="en">Waiting inside a callback</span><span lang="zh-Hant">在 callback 裡等待</span></h1>
+    <p class="lead" lang="en">Every ROS 2 node is a program, and inside it one part decides which piece of your code runs next: the <span class="who exec">executor</span>. In this session we freeze a node on purpose, find out exactly why it froze, and fix it in two ways. On the way you build a picture of the executor that explains a whole family of "my node just stopped" bugs.</p>
+    <p class="lead" lang="zh-Hant">每個 ROS 2 node 都是一個程式，程式裡有一個角色負責決定接下來跑你的哪一段程式碼：<span class="who exec">executor</span>。這堂課我們故意讓一個 node 卡住，搞清楚它到底為什麼卡住，再用兩種方法修好。過程中你會建立對 executor 的理解，一整類「我的 node 突然不動了」的 bug 都能用它解釋。</p>
+    <p class="howto" lang="en"><b>How to use this page.</b> The numbered Parts are what we do together in the session. Boxes and Parts marked <b>Go deeper</b> hold ideas that take longer to sink in. Skip them on the first pass. Come back to them after the session, or the day you meet the bug for real. The <b>中文</b> button (or the L key) switches the page to Chinese.</p>
+    <p class="howto" lang="zh-Hant"><b>怎麼用這一頁。</b>有編號的部分是課堂上一起做的。標成<b>延伸</b>的方塊和部分，放的是比較需要時間消化的觀念：第一次讀可以先跳過，課後再回來看，或等你真的遇到這個 bug 的那天。<b>English</b> 按鈕（或 L 鍵）可以切回英文。</p>
   </div>
 </div>
 
 <nav class="map" aria-label="Session map" data-home="../index.html"></nav>
 
 <!-- ============================================================ -->
-<h2 id="silent"><small>Part 1 · 15 min</small>A node that goes silent</h2>
+<h2 id="silent"><small><span lang="en">Part 1</span><span lang="zh-Hant">第 1 部分</span></small><span lang="en">A node that goes silent</span><span lang="zh-Hant">一個突然安靜的 node</span></h2>
 
-<p>Here is a small node, <span class="who a">blocking_client</span>. It has two timers. Every 0.5 s it prints <code>heartbeat</code>, so we can see it is alive. Every 3 s it asks a service, <span class="who b">slow_server</span>, to add 1 + 2. The server takes 2 s to answer.</p>
+<p lang="en">Here is a small node, <span class="who a">blocking_client</span>. It has two timers. Every 0.5 s it prints <code>heartbeat</code>, so we can see it is alive. Every 3 s it asks a service, <span class="who b">slow_server</span>, to add 1 + 2. The server takes 2 s to answer.</p>
+<p lang="zh-Hant">這是一個小 node：<span class="who a">blocking_client</span>。它有兩個 timer。每 0.5 秒印一次 <code>heartbeat</code>，讓我們知道它還活著。每 3 秒請一個 service <span class="who b">slow_server</span> 算 1 + 2。server 要 2 秒才會回覆。</p>
 
-<pre data-lang="py"><span class="hl" data-note="Two timers. Each one calls a function of ours when it comes due.">        self.create_timer(3.0, self.ask)
+<pre data-lang="py"><span class="hl" data-note="Two timers. Each one calls a function of ours when it comes due." data-note-zh="兩個 timer。到期時各自呼叫我們的一個函式。">        self.create_timer(3.0, self.ask)
         self.create_timer(0.5, self.heartbeat)
 </span>
     def ask(self):
         if not self.client.service_is_ready():
             return
-<span class="hl" data-note="call() sends the request and returns the reply. It looks just like calling a normal function.">        self.get_logger().info('calling...')
+<span class="hl" data-note="call() sends the request and returns the reply. It looks just like calling a normal function." data-note-zh="call() 送出 request 並回傳回覆，看起來就跟呼叫一般函式一樣。">        self.get_logger().info('calling...')
         result = self.client.call(AddTwoInts.Request(a=1, b=2))
         self.get_logger().info(f'result: {result.sum}')
 </span>
     def heartbeat(self):
         self.get_logger().info('heartbeat')
 ...
-<span class="hl" data-note="spin() keeps the node running: it calls our functions whenever a timer comes due.">rclpy.spin(BlockingClient())</span></pre>
-<p class="notes-hint">Point at a highlighted line to see a note. The whole file is <a href="code/blocking_client.py"><code>code/blocking_client.py</code></a>.</p>
+<span class="hl" data-note="spin() keeps the node running: it calls our functions whenever a timer comes due." data-note-zh="spin() 讓 node 一直跑：timer 到期時就呼叫我們的函式。">rclpy.spin(BlockingClient())</span></pre>
+<p class="notes-hint" lang="en">Point at a highlighted line to see a note. The whole file is <a href="code/blocking_client.py"><code>code/blocking_client.py</code></a>.</p>
+<p class="notes-hint" lang="zh-Hant">把滑鼠移到標起來的那幾行，可以看到說明。完整檔案在 <a href="code/blocking_client.py"><code>code/blocking_client.py</code></a>。</p>
 
-<p>I started the server in one terminal and the client in another, then merged their logs by time. Times are seconds since the client started, rounded to 0.1 s:</p>
+<p lang="en">I started the server in one terminal and the client in another, then merged their logs by time. Times are seconds since the client started, rounded to 0.1 s:</p>
+<p lang="zh-Hant">我在一個終端機開 server、另一個開 client，再把兩邊的 log 依時間合在一起。時間是 client 啟動後的秒數，取到 0.1 秒：</p>
 
 <pre class="term"><span class="m"> 0.5</span>  <span class="a">[blocking_client] heartbeat</span>
 <span class="m"> 1.0</span>  <span class="a">[blocking_client] heartbeat</span>
@@ -53,110 +63,135 @@
 <span class="m"> 3.0</span>  <span class="a">[blocking_client] calling...</span>
 <span class="m"> 3.0</span>  <span class="b">[slow_server] got 1 + 2, working...</span>
 <span class="m"> 5.0</span>  <span class="b">[slow_server] replied 3</span>
-      <span class="cm">(nothing more from blocking_client, ever)</span></pre>
+      <span class="cm"><span lang="en">(nothing more from blocking_client, ever)</span><span lang="zh-Hant">（之後 blocking_client 再也沒有輸出）</span></span></pre>
 
-<p>The server did its job: it replied at 5.0 s. Yet the client never printed the result. <mark>It also stopped printing <code>heartbeat</code>, although the heartbeat has nothing to do with the service.</mark> The process did not crash. It is still running, and doing nothing.</p>
+<p lang="en">The server did its job: it replied at 5.0 s. Yet the client never printed the result. <mark>It also stopped printing <code>heartbeat</code>, although the heartbeat has nothing to do with the service.</mark> The process did not crash. It is still running, and doing nothing.</p>
+<p lang="zh-Hant">server 有做事：它在 5.0 秒回覆了。但 client 一直沒印出結果。<mark>它連 <code>heartbeat</code> 都不印了，雖然 heartbeat 跟 service 完全無關。</mark>程式沒有當掉，它還在跑，只是什麼都不做。</p>
 
 <div class="think">
-  <p>Why would a timer that only prints one word stop working because of a service call? Write your guess down. We come back to it at the end of Part 3.</p>
+  <p lang="en">Why would a timer that only prints one word stop working because of a service call? Write your guess down. We come back to it at the end of Part 3.</p>
+  <p lang="zh-Hant">只印一個字的 timer，為什麼會因為一次 service 呼叫就停掉？把你的猜測寫下來，第 3 部分結尾會回來看。</p>
 </div>
 
 <!-- ============================================================ -->
-<h2 id="executor"><small>Part 2 · 25 min</small>One thread, many callbacks</h2>
+<h2 id="executor"><small><span lang="en">Part 2</span><span lang="zh-Hant">第 2 部分</span></small><span lang="en">One thread, many callbacks</span><span lang="zh-Hant">一條執行緒，很多 callback</span></h2>
 
-<p>A <b>callback</b> is a function you give to ROS for ROS to call later, when something happens: a timer comes due, a message arrives, a reply arrives. <code>ask</code> and <code>heartbeat</code> are callbacks. You never call them yourself.</p>
+<p lang="en">A <b>callback</b> is a function you give to ROS for ROS to call later, when something happens: a timer comes due, a message arrives, a reply arrives. <code>ask</code> and <code>heartbeat</code> are callbacks. You never call them yourself.</p>
+<p lang="zh-Hant"><b>callback</b> 是你交給 ROS、讓 ROS 在某件事發生時才呼叫的函式：timer 到期、message 到達、回覆到達。<code>ask</code> 和 <code>heartbeat</code> 都是 callback。你從來不會自己呼叫它們。</p>
 
-<p>The part of ROS that calls them is the <span class="who exec">executor</span>. <code>rclpy.spin(node)</code> creates one, a <b>SingleThreadedExecutor</b>, and runs it forever. A <b>thread</b> is one line of execution inside a program: it runs one instruction after another. This executor has exactly one, and that thread repeats three steps:</p>
+<p lang="en">The part of ROS that calls them is the <span class="who exec">executor</span>. <code>rclpy.spin(node)</code> creates one, a <b>SingleThreadedExecutor</b>, and runs it forever. A <b>thread</b> is one line of execution inside a program: it runs one instruction after another. This executor has exactly one, and that thread repeats three steps:</p>
+<p lang="zh-Hant">負責呼叫它們的是 <span class="who exec">executor</span>。<code>rclpy.spin(node)</code> 會建立一個 <b>SingleThreadedExecutor</b>，然後永遠跑下去。<b>執行緒</b>（thread）是程式裡的一條執行路線：一個指令接著一個指令跑。這個 executor 只有一條，而這條執行緒一直重複三個步驟：</p>
 
 <figure class="wide">
 <svg class="fig" viewBox="0 0 760 280" role="img" aria-label="The executor's loop. Step 1, wait until at least one thing is ready: the heartbeat timer, the ask timer, or a reply from add_two_ints. Step 2, take one ready callback. Step 3, run it to the end on the one thread; while it runs, nothing else in this node runs. Then back to waiting.">
   <rect x="20" y="40" width="260" height="180" rx="10" fill="#fff" stroke="#3d4a5c" stroke-width="1.5"/>
-  <text x="36" y="66" font-size="15" font-weight="700" fill="#0d1b2a">① Wait</text>
-  <text x="36" y="86" font-size="12.5" fill="#5a6779">until at least one thing is ready</text>
+  <text x="36" y="66" font-size="15" font-weight="700" fill="#0d1b2a" lang="en">① Wait</text>
+  <text x="36" y="66" font-size="15" font-weight="700" fill="#0d1b2a" lang="zh-Hant">① 等待</text>
+  <text x="36" y="86" font-size="12.5" fill="#5a6779" lang="en">until at least one thing is ready</text>
+  <text x="36" y="86" font-size="12.5" fill="#5a6779" lang="zh-Hant">直到至少一件事準備好</text>
   <rect x="36" y="100" width="228" height="30" rx="5" fill="#e6e9ee" stroke="#3d4a5c"/>
-  <text x="48" y="120" font-size="13" fill="#0d1b2a">timer heartbeat · every 0.5 s</text>
+  <text x="48" y="120" font-size="13" fill="#0d1b2a" lang="en">timer heartbeat · every 0.5 s</text>
+  <text x="48" y="120" font-size="13" fill="#0d1b2a" lang="zh-Hant">timer heartbeat · 每 0.5 秒</text>
   <rect x="36" y="138" width="228" height="30" rx="5" fill="#e6e9ee" stroke="#3d4a5c"/>
-  <text x="48" y="158" font-size="13" fill="#0d1b2a">timer ask · every 3 s</text>
+  <text x="48" y="158" font-size="13" fill="#0d1b2a" lang="en">timer ask · every 3 s</text>
+  <text x="48" y="158" font-size="13" fill="#0d1b2a" lang="zh-Hant">timer ask · 每 3 秒</text>
   <rect x="36" y="176" width="228" height="30" rx="5" fill="#efe7fd" stroke="#7b3fe4"/>
-  <text x="48" y="196" font-size="13" fill="#5a2db8">reply from add_two_ints</text>
+  <text x="48" y="196" font-size="13" fill="#5a2db8" lang="en">reply from add_two_ints</text>
+  <text x="48" y="196" font-size="13" fill="#5a2db8" lang="zh-Hant">add_two_ints 的回覆</text>
 
   <rect x="320" y="95" width="150" height="70" rx="10" fill="#fff" stroke="#3d4a5c" stroke-width="1.5"/>
-  <text x="395" y="125" font-size="15" font-weight="700" text-anchor="middle" fill="#0d1b2a">② Take one</text>
-  <text x="395" y="146" font-size="12.5" text-anchor="middle" fill="#5a6779">a ready callback</text>
+  <text x="395" y="125" font-size="15" font-weight="700" text-anchor="middle" fill="#0d1b2a" lang="en">② Take one</text>
+  <text x="395" y="125" font-size="15" font-weight="700" text-anchor="middle" fill="#0d1b2a" lang="zh-Hant">② 拿一個</text>
+  <text x="395" y="146" font-size="12.5" text-anchor="middle" fill="#5a6779" lang="en">a ready callback</text>
+  <text x="395" y="146" font-size="12.5" text-anchor="middle" fill="#5a6779" lang="zh-Hant">準備好的 callback</text>
 
   <rect x="510" y="40" width="230" height="180" rx="10" fill="#fff" stroke="#3d4a5c" stroke-width="1.5"/>
-  <text x="526" y="66" font-size="15" font-weight="700" fill="#0d1b2a">③ Run it to the end</text>
-  <text x="526" y="86" font-size="12.5" fill="#5a6779">on the one thread</text>
+  <text x="526" y="66" font-size="15" font-weight="700" fill="#0d1b2a" lang="en">③ Run it to the end</text>
+  <text x="526" y="66" font-size="15" font-weight="700" fill="#0d1b2a" lang="zh-Hant">③ 跑到結束</text>
+  <text x="526" y="86" font-size="12.5" fill="#5a6779" lang="en">on the one thread</text>
+  <text x="526" y="86" font-size="12.5" fill="#5a6779" lang="zh-Hant">在唯一的執行緒上</text>
   <rect x="526" y="102" width="198" height="36" rx="5" fill="#3d4a5c"/>
   <text x="625" y="125" font-size="14" text-anchor="middle" fill="#fff" class="mono">heartbeat()</text>
-  <text x="526" y="170" font-size="13" font-weight="700" fill="#0d1b2a">While it runs, nothing else</text>
-  <text x="526" y="188" font-size="13" font-weight="700" fill="#0d1b2a">in this node runs.</text>
+  <text x="526" y="170" font-size="13" font-weight="700" fill="#0d1b2a" lang="en">While it runs, nothing else</text>
+  <text x="526" y="188" font-size="13" font-weight="700" fill="#0d1b2a" lang="en">in this node runs.</text>
+  <text x="526" y="170" font-size="13" font-weight="700" fill="#0d1b2a" lang="zh-Hant">它在跑的時候，這個 node</text>
+  <text x="526" y="188" font-size="13" font-weight="700" fill="#0d1b2a" lang="zh-Hant">的其他東西都不會跑。</text>
 
   <g fill="#3d4a5c">
     <path d="M280 130 H310" stroke="#3d4a5c" stroke-width="2.5"/><polygon points="320,130 309,125 309,135"/>
     <path d="M470 130 H500" stroke="#3d4a5c" stroke-width="2.5"/><polygon points="510,130 499,125 499,135"/>
     <path d="M625 220 C 625 258, 150 258, 150 232" fill="none" stroke="#3d4a5c" stroke-width="2.5"/><polygon points="150,221 145,233 155,233"/>
   </g>
-  <text x="388" y="272" font-size="13" text-anchor="middle" fill="#5a6779">then back to waiting, forever</text>
+  <text x="388" y="272" font-size="13" text-anchor="middle" fill="#5a6779" lang="en">then back to waiting, forever</text>
+  <text x="388" y="272" font-size="13" text-anchor="middle" fill="#5a6779" lang="zh-Hant">然後回去等，永遠如此</text>
 </svg>
-<figcaption>The loop inside <code>rclpy.spin()</code>. Timers, messages and replies all wait in step ①, and they all need the same thread in step ③.</figcaption>
+<figcaption><span lang="en">The loop inside <code>rclpy.spin()</code>. Timers, messages and replies all wait in step ①, and they all need the same thread in step ③.</span><span lang="zh-Hant"><code>rclpy.spin()</code> 裡面的迴圈。timer、message、回覆都在步驟 ① 等待，也都需要步驟 ③ 的同一條執行緒。</span></figcaption>
 </figure>
 
-<p><mark>A single-threaded executor runs one callback at a time, from start to finish.</mark> While a callback runs, the thread is busy, so every other timer, message and reply of this node waits. A callback that returns quickly costs nothing. A callback that takes a long time delays everything else.</p>
+<p lang="en"><mark>A single-threaded executor runs one callback at a time, from start to finish.</mark> While a callback runs, the thread is busy, so every other timer, message and reply of this node waits. A callback that returns quickly costs nothing. A callback that takes a long time delays everything else.</p>
+<p lang="zh-Hant"><mark>single-threaded executor 一次只跑一個 callback，從頭跑到尾。</mark>callback 在跑的時候執行緒是忙的，這個 node 的其他 timer、message、回覆都得等。很快 return 的 callback 沒什麼成本；跑很久的 callback 會拖慢其他所有東西。</p>
 
 <div class="quiz">
-  <button><b><code>heartbeat()</code> calls <code>time.sleep(2)</code>.</b> Does <code>ask</code> still run every 3 s?<span class="ans">No. While <code>heartbeat()</code> sleeps, the only thread is busy. When <code>ask</code> comes due, it waits until <code>heartbeat()</code> returns, so it can run up to 2 s late.</span></button>
-  <button><b>Both timers come due at t = 3.0 s.</b> How many callbacks run at that moment?<span class="ans">One. The other one waits until the first returns. With one thread, two callbacks never run at the same time.</span></button>
-  <button><b>A callback takes 0.1 s, and its timer fires every 0.5 s.</b> Is that a problem?<span class="ans">Not by itself. The thread is busy 20% of the time and free the rest. It only becomes a problem if other callbacks need to run at an exact time.</span></button>
+  <button><span lang="en"><b><code>heartbeat()</code> calls <code>time.sleep(2)</code>.</b> Does <code>ask</code> still run every 3 s?</span><span lang="zh-Hant"><b><code>heartbeat()</code> 裡面呼叫 <code>time.sleep(2)</code>。</b><code>ask</code> 還會每 3 秒跑一次嗎？</span><span class="ans"><span lang="en">No. While <code>heartbeat()</code> sleeps, the only thread is busy. When <code>ask</code> comes due, it waits until <code>heartbeat()</code> returns, so it can run up to 2 s late.</span><span lang="zh-Hant">不會。<code>heartbeat()</code> 在 sleep 時，唯一的執行緒是忙的。<code>ask</code> 到期時要等 <code>heartbeat()</code> return，所以最多可能晚 2 秒。</span></span></button>
+  <button><span lang="en"><b>Both timers come due at t = 3.0 s.</b> How many callbacks run at that moment?</span><span lang="zh-Hant"><b>兩個 timer 都在 t = 3.0 秒到期。</b>那一刻會跑幾個 callback？</span><span class="ans"><span lang="en">One. The other one waits until the first returns. With one thread, two callbacks never run at the same time.</span><span lang="zh-Hant">一個。另一個要等第一個 return。只有一條執行緒時，兩個 callback 不會同時跑。</span></span></button>
+  <button><span lang="en"><b>A callback takes 0.1 s, and its timer fires every 0.5 s.</b> Is that a problem?</span><span lang="zh-Hant"><b>一個 callback 要跑 0.1 秒，它的 timer 每 0.5 秒觸發一次。</b>這樣有問題嗎？</span><span class="ans"><span lang="en">Not by itself. The thread is busy 20% of the time and free the rest. It only becomes a problem if other callbacks need to run at an exact time.</span><span lang="zh-Hant">本身沒問題。執行緒 20% 的時間在忙，其他時間是空的。只有在其他 callback 必須準時跑的時候，才會變成問題。</span></span></button>
 </div>
 
 <div class="case robot">
-  <div class="case-h">On a robot</div>
-  <div class="case-t">A slow callback makes a control loop late</div>
-  <p>Say one node runs a control loop on a 50 Hz timer, every 20 ms, and the same node also handles camera images in a callback that takes 100 ms. While an image is being handled, the control timer waits. The motors get no new command for 100 ms, five ticks in a row. Nothing crashes, and nothing in the log looks wrong: the robot just drives worse. The usual fix is to keep slow work out of the node that controls the motors.</p>
+  <div class="case-h"><span lang="en">On a robot</span><span lang="zh-Hant">在機器人上</span></div>
+  <div class="case-t"><span lang="en">A slow callback makes a control loop late</span><span lang="zh-Hant">慢的 callback 讓控制迴圈遲到</span></div>
+  <p lang="en">Say one node runs a control loop on a 50 Hz timer, every 20 ms, and the same node also handles camera images in a callback that takes 100 ms. While an image is being handled, the control timer waits. The motors get no new command for 100 ms, five ticks in a row. Nothing crashes, and nothing in the log looks wrong: the robot just drives worse. The usual fix is to keep slow work out of the node that controls the motors.</p>
+  <p lang="zh-Hant">假設一個 node 用 50 Hz 的 timer 跑控制迴圈（每 20 ms 一次），同一個 node 還有一個處理相機影像的 callback，每次要 100 ms。處理影像時，控制 timer 只能等。馬達有 100 ms 收不到新指令，連續漏掉五次。沒有東西當掉，log 裡也看不出異狀：機器人只是開得比較差。常見的解法是把慢的工作移出控制馬達的 node。</p>
 </div>
 
 <!-- ============================================================ -->
-<h2 id="reply"><small>Part 3 · 25 min</small>Waiting for a reply that cannot arrive</h2>
+<h2 id="reply"><small><span lang="en">Part 3</span><span lang="zh-Hant">第 3 部分</span></small><span lang="en">Waiting for a reply that cannot arrive</span><span lang="zh-Hant">等一個不可能到的回覆</span></h2>
 
-<p>Now look at <code>call()</code> again. It does two things: it sends the request, and then it makes the <b>current thread</b> wait until the reply has been handled. Who handles the reply? The reply is just one more thing that becomes ready in step ① of the loop. So the thread of the <span class="who exec">executor</span> must take it and handle it, the same way it runs a timer.</p>
+<p lang="en">Now look at <code>call()</code> again. It does two things: it sends the request, and then it makes the <b>current thread</b> wait until the reply has been handled. Who handles the reply? The reply is just one more thing that becomes ready in step ① of the loop. So the thread of the <span class="who exec">executor</span> must take it and handle it, the same way it runs a timer.</p>
+<p lang="zh-Hant">再看一次 <code>call()</code>。它做兩件事：送出 request，然後讓<b>目前這條執行緒</b>等到回覆被處理完。誰來處理回覆？回覆只是迴圈步驟 ① 裡又一件準備好的事，所以必須由 <span class="who exec">executor</span> 的執行緒拿去處理，就跟跑 timer 一樣。</p>
 
-<p><mark>The only thread that can handle the reply is the one waiting for it.</mark> Step through it before reading on.</p>
+<p lang="en"><mark>The only thread that can handle the reply is the one waiting for it.</mark> Step through it before reading on.</p>
+<p lang="zh-Hant"><mark>唯一能處理回覆的執行緒，正是在等回覆的那一條。</mark>讀下去之前，先一步一步走一遍。</p>
 
 <div class="callout walk">
   <div class="glyph">W1</div>
-  <div><b>Walkthrough 1: A wait that never ends.</b> Follow the executor's one thread from <code>spin()</code> into <code>call()</code>, watch the reply arrive and wait, then replay the same moment with the first fix. Make the guess on the way.
-    <br><a class="btn" href="walk/blocking-call.html">Open walkthrough 1 ▶</a> <span class="muted">11 steps · ← → or a clicker · E for the explanation</span></div>
+  <div>
+    <span lang="en"><b>Walkthrough 1: A wait that never ends.</b> Follow the executor's one thread from <code>spin()</code> into <code>call()</code>, watch the reply arrive and wait, then replay the same moment with the first fix.</span>
+    <span lang="zh-Hant"><b>逐步解說 1：等不到的回覆。</b>跟著 executor 唯一的執行緒，從 <code>spin()</code> 走進 <code>call()</code>，看回覆到了卻只能等，再用第一種修法重播同一個時刻。</span>
+    <br><a class="btn" href="walk/blocking-call.html"><span lang="en">Open walkthrough 1 ▶</span><span lang="zh-Hant">開啟逐步解說 1 ▶</span></a> <span class="muted"><span lang="en">11 steps · ← → or a clicker · E for the explanation · L for 中文</span><span lang="zh-Hant">11 步 · ← → 或簡報筆 · E 看說明 · L 切換語言</span></span></div>
 </div>
 
-<p>The thread waits for the reply to be handled, and the reply waits for the thread to be free. Each waits for the other, so neither can move. This is a <b>deadlock</b>. Every other callback of the node waits behind the same thread, and that answers the question from Part 1: <mark>the heartbeat stopped because it needs the thread that is stuck in <code>call()</code></mark>.</p>
+<p lang="en">The thread waits for the reply to be handled, and the reply waits for the thread to be free. Each waits for the other, so neither can move. This is a <b>deadlock</b>. Every other callback of the node waits behind the same thread, and that answers the question from Part 1: <mark>the heartbeat stopped because it needs the thread that is stuck in <code>call()</code></mark>.</p>
+<p lang="zh-Hant">執行緒在等回覆被處理，回覆在等執行緒有空。兩邊都在等對方，誰都動不了。這就是<b>死結</b>（deadlock）。這個 node 的其他 callback 也都排在同一條執行緒後面，這就回答了第 1 部分的問題：<mark>heartbeat 停了，是因為它需要的那條執行緒卡在 <code>call()</code> 裡</mark>。</p>
 
 <table class="t">
-  <tr><th>Who</th><th>is waiting for</th><th>which needs</th></tr>
-  <tr><td>the thread, inside <code>call()</code></td><td>the reply to be handled</td><td>the thread</td></tr>
-  <tr><td>the reply</td><td>the thread to be free</td><td><code>call()</code> to return</td></tr>
-  <tr><td>the heartbeat timer</td><td>the thread to be free</td><td><code>call()</code> to return</td></tr>
+  <tr><th><span lang="en">Who</span><span lang="zh-Hant">誰</span></th><th><span lang="en">is waiting for</span><span lang="zh-Hant">在等</span></th><th><span lang="en">which needs</span><span lang="zh-Hant">而那需要</span></th></tr>
+  <tr><td><span lang="en">the thread, inside <code>call()</code></span><span lang="zh-Hant">執行緒（在 <code>call()</code> 裡）</span></td><td><span lang="en">the reply to be handled</span><span lang="zh-Hant">回覆被處理</span></td><td><span lang="en">the thread</span><span lang="zh-Hant">執行緒</span></td></tr>
+  <tr><td><span lang="en">the reply</span><span lang="zh-Hant">回覆</span></td><td><span lang="en">the thread to be free</span><span lang="zh-Hant">執行緒有空</span></td><td><span lang="en"><code>call()</code> to return</span><span lang="zh-Hant"><code>call()</code> return</span></td></tr>
+  <tr><td><span lang="en">the heartbeat timer</span><span lang="zh-Hant">heartbeat timer</span></td><td><span lang="en">the thread to be free</span><span lang="zh-Hant">執行緒有空</span></td><td><span lang="en"><code>call()</code> to return</span><span lang="zh-Hant"><code>call()</code> return</span></td></tr>
 </table>
 
 <div class="quiz">
-  <button><b>Would a faster server fix it?</b> Say it replies in 1 ms.<span class="ans">No. The reply arrives sooner, but it still waits for the thread, and the thread still waits for the reply.</span></button>
-  <button><b>Is the reply lost on the network?</b><span class="ans">No. It reaches the client's process. What never happens is the step after that: the executor handling it.</span></button>
-  <button><b>Which other kinds of wait inside a callback would freeze the node the same way?</b><span class="ans">Any wait for something only this executor can deliver: a reply, a message, or the result of an action. <code>time.sleep()</code> is different: it ends by itself, but it still blocks every other callback while it runs.</span></button>
+  <button><span lang="en"><b>Would a faster server fix it?</b> Say it replies in 1 ms.</span><span lang="zh-Hant"><b>server 快一點能解決嗎？</b>假設它 1 ms 就回覆。</span><span class="ans"><span lang="en">No. The reply arrives sooner, but it still waits for the thread, and the thread still waits for the reply.</span><span lang="zh-Hant">不能。回覆早點到，但還是要等執行緒，而執行緒還是在等回覆。</span></span></button>
+  <button><span lang="en"><b>Is the reply lost on the network?</b></span><span lang="zh-Hant"><b>回覆是不是在網路上弄丟了？</b></span><span class="ans"><span lang="en">No. It reaches the client's process. What never happens is the step after that: the executor handling it.</span><span lang="zh-Hant">沒有。回覆有到 client 的 process。永遠沒發生的是下一步：executor 去處理它。</span></span></button>
+  <button><span lang="en"><b>Which other kinds of wait inside a callback would freeze the node the same way?</b></span><span lang="zh-Hant"><b>在 callback 裡還有哪些等待，也會這樣卡住 node？</b></span><span class="ans"><span lang="en">Any wait for something only this executor can deliver: a reply, a message, or the result of an action. <code>time.sleep()</code> is different: it ends by itself, but it still blocks every other callback while it runs.</span><span lang="zh-Hant">任何在等「只有這個 executor 才送得來的東西」的等待：回覆、message、action 的結果。<code>time.sleep()</code> 不一樣：它自己會結束，但 sleep 期間一樣會擋住其他 callback。</span></span></button>
 </div>
 
 <!-- ============================================================ -->
-<h2 id="fixes"><small>Part 4 · 35 min</small>Two ways out</h2>
+<h2 id="fixes"><small><span lang="en">Part 4</span><span lang="zh-Hant">第 4 部分</span></small><span lang="en">Two ways out</span><span lang="zh-Hant">兩種解法</span></h2>
 
-<p>There are two ways out. Either nobody waits inside a callback, or the reply gets a thread of its own.</p>
+<p lang="en">There are two ways out. Either nobody waits inside a callback, or the reply gets a thread of its own.</p>
+<p lang="zh-Hant">有兩條路：要嘛沒有人在 callback 裡等，要嘛讓回覆有自己的執行緒。</p>
 
-<h3>Fix 1: don't wait</h3>
-<p><code>call_async()</code> sends the request and returns at once. What it returns is a <b>future</b>: an object that will hold the reply later. We tell the future which function to run when the reply is in. That function is another callback, so the executor runs it like any other.</p>
+<h3><span lang="en">Fix 1: don't wait</span><span lang="zh-Hant">修法 1：不要等</span></h3>
+<p lang="en"><code>call_async()</code> sends the request and returns at once. What it returns is a <b>future</b>: an object that will hold the reply later. We tell the future which function to run when the reply is in. That function is another callback, so the executor runs it like any other.</p>
+<p lang="zh-Hant"><code>call_async()</code> 送出 request 後馬上 return，回傳的是一個 <b>future</b>：之後會裝著回覆的物件。我們告訴 future，回覆到了要跑哪個函式。那個函式也是一個 callback，executor 會像跑其他 callback 一樣跑它。</p>
 
 <pre data-lang="py">    def ask(self):
         ...
         self.get_logger().info('calling...')
-<span class="hl" data-note="Sends the request and returns at once with a future. ask() then returns, and the thread is free.">        future = self.client.call_async(AddTwoInts.Request(a=1, b=2))</span>
-<span class="hl" data-note="on_reply will run when the reply has been handled: a new callback, run by the same one thread.">        future.add_done_callback(self.on_reply)</span>
+<span class="hl" data-note="Sends the request and returns at once with a future. ask() then returns, and the thread is free." data-note-zh="送出 request，馬上 return 一個 future。接著 ask() return，執行緒就空出來了。">        future = self.client.call_async(AddTwoInts.Request(a=1, b=2))</span>
+<span class="hl" data-note="on_reply will run when the reply has been handled: a new callback, run by the same one thread." data-note-zh="回覆處理完後會跑 on_reply：一個新的 callback，由同一條執行緒來跑。">        future.add_done_callback(self.on_reply)</span>
 
     def on_reply(self, future):
         self.get_logger().info(f'result: {future.result().sum}')</pre>
@@ -170,87 +205,98 @@
 <span class="m"> 5.0</span>  <span class="a">[async_client] heartbeat</span>
 <span class="m"> 5.0</span>  <span class="b">[slow_server] replied 3</span>
 <span class="m"> 5.0</span>  <span class="ok">[async_client] result: 3</span></pre>
-<p>The heartbeat goes on while the server works, and the result arrives at 5.0 s. The cost is that the code after the call moves into a different function.</p>
+<p lang="en">The heartbeat goes on while the server works, and the result arrives at 5.0 s. The cost is that the code after the call moves into a different function.</p>
+<p lang="zh-Hant">server 處理期間 heartbeat 照常，結果在 5.0 秒到達。代價是：呼叫之後的程式碼要搬到另一個函式裡。</p>
 
-<h3>Fix 2: give the executor more threads</h3>
-<p>A <b>MultiThreadedExecutor</b> has several threads, so it can run several callbacks at the same time. But more threads alone are not enough. By default, all callbacks of a node are in one <b>callback group</b>, and the executor never runs two callbacks of one such group at the same time. So we put the timer, the reply and the heartbeat into three separate groups:</p>
+<h3><span lang="en">Fix 2: give the executor more threads</span><span lang="zh-Hant">修法 2：給 executor 更多執行緒</span></h3>
+<p lang="en">A <b>MultiThreadedExecutor</b> has several threads, so it can run several callbacks at the same time. But more threads alone are not enough. By default, all callbacks of a node are in one <b>callback group</b>, and the executor never runs two callbacks of one such group at the same time. So we put the timer, the reply and the heartbeat into three separate groups:</p>
+<p lang="zh-Hant"><b>MultiThreadedExecutor</b> 有好幾條執行緒，可以同時跑好幾個 callback。但光有更多執行緒還不夠。預設情況下，一個 node 的所有 callback 都在同一個 <b>callback group</b> 裡，而 executor 不會同時跑同一個這種 group 裡的兩個 callback。所以我們把 timer、回覆和 heartbeat 分到三個不同的 group：</p>
 
-<pre data-lang="py"><span class="hl" data-note="Each group allows only one of its callbacks to run at a time. Three groups: three callbacks may run at once.">        self.client = self.create_client(AddTwoInts, 'add_two_ints',
+<pre data-lang="py"><span class="hl" data-note="Each group allows only one of its callbacks to run at a time. Three groups: three callbacks may run at once." data-note-zh="每個 group 一次只讓一個 callback 跑。三個 group：可以同時跑三個 callback。">        self.client = self.create_client(AddTwoInts, 'add_two_ints',
                                          callback_group=MutuallyExclusiveCallbackGroup())
         self.create_timer(3.0, self.ask, callback_group=MutuallyExclusiveCallbackGroup())
         self.create_timer(0.5, self.heartbeat, callback_group=MutuallyExclusiveCallbackGroup())</span>
 ...
-<span class="hl" data-note="Waiting inside ask() is fine now: another thread handles the reply, and a third runs the heartbeat. rclpy.ok() lets Ctrl+C end the wait.">        while rclpy.ok() and not future.done():
+<span class="hl" data-note="Waiting inside ask() is fine now: another thread handles the reply, and a third runs the heartbeat. rclpy.ok() lets Ctrl+C end the wait." data-note-zh="現在在 ask() 裡等沒問題：另一條執行緒處理回覆，第三條跑 heartbeat。rclpy.ok() 讓 Ctrl+C 能結束這個等待。">        while rclpy.ok() and not future.done():
             time.sleep(0.1)</span>
 ...
-<span class="hl" data-note="Several threads instead of one.">    executor = MultiThreadedExecutor()
+<span class="hl" data-note="Several threads instead of one." data-note-zh="好幾條執行緒，而不是一條。">    executor = MultiThreadedExecutor()
     executor.add_node(GroupsClient())
     executor.spin()</span></pre>
 
-<p>The output looks like Fix 1's: heartbeats every 0.5 s during the wait, then <code>result: 3</code> at 5.0 s. <mark>Waiting inside a callback is safe only if some other thread is free to deliver what you wait for.</mark></p>
+<p lang="en">The output looks like Fix 1's: heartbeats every 0.5 s during the wait, then <code>result: 3</code> at 5.0 s. <mark>Waiting inside a callback is safe only if some other thread is free to deliver what you wait for.</mark></p>
+<p lang="zh-Hant">輸出跟修法 1 差不多：等待期間每 0.5 秒一次 heartbeat，5.0 秒印出 <code>result: 3</code>。<mark>只有在別的執行緒有空、能把你在等的東西送來時，在 callback 裡等待才安全。</mark></p>
 
 <table class="t">
-  <tr><th></th><th>Fix 1: <code>call_async</code> + done callback</th><th>Fix 2: more threads + callback groups</th></tr>
-  <tr><td>Threads</td><td>one</td><td>several</td></tr>
-  <tr><td>Where the code after the call goes</td><td>into another function, <code>on_reply</code></td><td>stays right after the call</td></tr>
-  <tr><td>New things that can go wrong</td><td>few</td><td>two callbacks can now touch the same data at once</td></tr>
-  <tr><td>Use it when</td><td>you can: it is the simpler choice</td><td>the code after the call must stay in order, step by step</td></tr>
+  <tr><th></th><th><span lang="en">Fix 1: <code>call_async</code> + done callback</span><span lang="zh-Hant">修法 1：<code>call_async</code> + done callback</span></th><th><span lang="en">Fix 2: more threads + callback groups</span><span lang="zh-Hant">修法 2：更多執行緒 + callback group</span></th></tr>
+  <tr><td><span lang="en">Threads</span><span lang="zh-Hant">執行緒</span></td><td><span lang="en">one</span><span lang="zh-Hant">一條</span></td><td><span lang="en">several</span><span lang="zh-Hant">好幾條</span></td></tr>
+  <tr><td><span lang="en">Where the code after the call goes</span><span lang="zh-Hant">呼叫之後的程式碼放哪</span></td><td><span lang="en">into another function, <code>on_reply</code></span><span lang="zh-Hant">搬到另一個函式 <code>on_reply</code></span></td><td><span lang="en">stays right after the call</span><span lang="zh-Hant">留在呼叫的下一行</span></td></tr>
+  <tr><td><span lang="en">New things that can go wrong</span><span lang="zh-Hant">新的出錯可能</span></td><td><span lang="en">few</span><span lang="zh-Hant">不多</span></td><td><span lang="en">two callbacks can now touch the same data at once</span><span lang="zh-Hant">兩個 callback 可能同時改同一份資料</span></td></tr>
+  <tr><td><span lang="en">Use it when</span><span lang="zh-Hant">什麼時候用</span></td><td><span lang="en">you can: it is the simpler choice</span><span lang="zh-Hant">能用就用：它比較簡單</span></td><td><span lang="en">the code after the call must stay in order, step by step</span><span lang="zh-Hant">呼叫之後的程式碼必須照順序一步一步跑</span></td></tr>
 </table>
 
 <details class="deeper">
-  <summary>Go deeper: why doesn't ROS give every callback its own thread? <small>read after the session</small></summary>
-  <p>It could, and you can ask for it: a <b>ReentrantCallbackGroup</b> lets its callbacks run on any number of threads at once. The price is that two callbacks may then change the same variable at the same moment. Suppose a pose callback writes <code>self.x</code> and then <code>self.y</code>, while a control callback on another thread reads both. The control callback can read the new <code>x</code> with the old <code>y</code>: a pose the robot was never at. This is a <b>race condition</b>. It shows up rarely and differently each time, which makes it one of the hardest bugs to find.</p>
-  <p>That is why the default is the careful one: one group per node, one callback at a time. Each extra group is a decision that "these callbacks never share data, or protect it with a lock". Locks, and why they bring their own deadlocks, are a topic of OS‑2.</p>
+  <summary><span lang="en">Go deeper: why doesn't ROS give every callback its own thread?</span><span lang="zh-Hant">延伸：ROS 為什麼不讓每個 callback 都有自己的執行緒？</span> <small><span lang="en">read after the session</span><span lang="zh-Hant">課後再讀</span></small></summary>
+  <p lang="en">It could, and you can ask for it: a <b>ReentrantCallbackGroup</b> lets its callbacks run on any number of threads at once. The price is that two callbacks may then change the same variable at the same moment. Suppose a pose callback writes <code>self.x</code> and then <code>self.y</code>, while a control callback on another thread reads both. The control callback can read the new <code>x</code> with the old <code>y</code>: a pose the robot was never at. This is a <b>race condition</b>. It shows up rarely and differently each time, which makes it one of the hardest bugs to find.</p>
+  <p lang="zh-Hant">可以，而且你可以要求：<b>ReentrantCallbackGroup</b> 讓它的 callback 同時在任意多條執行緒上跑。代價是兩個 callback 可能在同一刻改同一個變數。假設 pose 的 callback 先寫 <code>self.x</code> 再寫 <code>self.y</code>，同時另一條執行緒上的控制 callback 在讀這兩個值。控制 callback 可能讀到新的 <code>x</code> 配舊的 <code>y</code>：一個機器人從來沒到過的位置。這叫 <b>race condition</b>。它很少出現，每次的樣子還不一樣，是最難找的 bug 之一。</p>
+  <p lang="en">That is why the default is the careful one: one group per node, one callback at a time. Each extra group is a decision that "these callbacks never share data, or protect it with a lock". Locks, and why they bring their own deadlocks, are a topic of OS‑2.</p>
+  <p lang="zh-Hant">所以預設值選了保守的那一種：每個 node 一個 group，一次一個 callback。每多一個 group，就是在宣告「這些 callback 從不共用資料，或有用 lock 保護」。lock 以及它為什麼會帶來新的死結，是 OS‑2 的主題。</p>
 </details>
 
 <div class="try">
-  <div class="try-h">Try it · 10 min</div>
-  <div class="try-t">Freeze a node, then fix it</div>
-  <p>You need the club's Humble image once (see <code>ros2-basics/verify/README.md</code> to build <code>dit-ros2-tutorial:humble</code>). From this worksheet's folder:</p>
+  <div class="try-h"><span lang="en">Try it</span><span lang="zh-Hant">動手試</span></div>
+  <div class="try-t"><span lang="en">Freeze a node, then fix it</span><span lang="zh-Hant">讓 node 卡住，再修好它</span></div>
+  <p lang="en">You need the club's Humble image once (see <code>ros2-basics/verify/README.md</code> to build <code>dit-ros2-tutorial:humble</code>). From this worksheet's folder:</p>
+  <p lang="zh-Hant">需要先建好社團的 Humble image（照 <code>ros2-basics/verify/README.md</code> 建立 <code>dit-ros2-tutorial:humble</code>，只要做一次）。在這份學習單的資料夾裡：</p>
 <pre data-lang="sh">docker run -it --rm --name ws0 -v "$PWD/code":/code \
     dit-ros2-tutorial:humble bash
 cd /code &amp;&amp; python3 slow_server.py</pre>
-  <p>In a second terminal, <code>docker exec -it ws0 bash</code>, then <code>cd /code</code>. Before each run, say what you expect to see at t = 4 s.</p>
+  <p lang="en">In a second terminal, <code>docker exec -it ws0 bash</code>, then <code>cd /code</code>. Before each run, say what you expect to see at t = 4 s.</p>
+  <p lang="zh-Hant">開第二個終端機，<code>docker exec -it ws0 bash</code>，再 <code>cd /code</code>。每次執行前，先說出你預期 t = 4 秒時會看到什麼。</p>
   <ol>
-    <li><code>python3 blocking_client.py</code>. Wait for <code>calling...</code>, count to five, then press Ctrl+C. Keep the traceback: Part 5 reads it.</li>
-    <li><code>python3 async_client.py</code>. Do heartbeats appear between <code>calling...</code> and <code>result: 3</code>?</li>
-    <li><code>python3 groups_client.py</code>. Same question. Then put all three callbacks back into one group and run it again. What do you expect?</li>
+    <li><span lang="en"><code>python3 blocking_client.py</code>. Wait for <code>calling...</code>, count to five, then press Ctrl+C. Keep the traceback: Part 5 reads it.</span><span lang="zh-Hant"><code>python3 blocking_client.py</code>。等它印出 <code>calling...</code>，數到五，按 Ctrl+C。把 traceback 留著：第 5 部分會讀它。</span></li>
+    <li><span lang="en"><code>python3 async_client.py</code>. Do heartbeats appear between <code>calling...</code> and <code>result: 3</code>?</span><span lang="zh-Hant"><code>python3 async_client.py</code>。<code>calling...</code> 和 <code>result: 3</code> 之間有 heartbeat 嗎？</span></li>
+    <li><span lang="en"><code>python3 groups_client.py</code>. Same question. Then put all three callbacks back into one group and run it again. What do you expect?</span><span lang="zh-Hant"><code>python3 groups_client.py</code>。同樣的問題。然後把三個 callback 放回同一個 group 再跑一次。你預期會怎樣？</span></li>
   </ol>
 </div>
 
 <!-- ============================================================ -->
-<h2 id="inside" class="deeper"><small>Part 5 · Go deeper</small>Inside <code>call()</code> and <code>spin()</code></h2>
+<h2 id="inside" class="deeper"><small><span lang="en">Part 5 · Go deeper</span><span lang="zh-Hant">第 5 部分 · 延伸</span></small><span lang="en">Inside <code>call()</code> and <code>spin()</code></span><span lang="zh-Hant"><code>call()</code> 和 <code>spin()</code> 的內部</span></h2>
 
-<p>Everything in Parts 2 and 3 can be checked in rclpy's own source, which is plain Python. These excerpts are from ROS 2 Humble, with their real line numbers. <code>rclpy.spin()</code> is a loop around <code>spin_once()</code>:</p>
+<p lang="en">Everything in Parts 2 and 3 can be checked in rclpy's own source, which is plain Python. These excerpts are from ROS 2 Humble, with their real line numbers. <code>rclpy.spin()</code> is a loop around <code>spin_once()</code>:</p>
+<p lang="zh-Hant">第 2、3 部分講的每件事，都可以在 rclpy 自己的原始碼裡驗證，它就是普通的 Python。以下節錄自 ROS 2 Humble，行號是真的。<code>rclpy.spin()</code> 是包著 <code>spin_once()</code> 的迴圈：</p>
 
 <pre data-lang="py"><span class="m"># rclpy/__init__.py</span>
-<span class="hl" data-note="Line 228: loop as long as ROS is running (until Ctrl+C or shutdown)."><span class="m">228</span>      while executor.context.ok():
+<span class="hl" data-note="Line 228: loop as long as ROS is running (until Ctrl+C or shutdown)." data-note-zh="第 228 行：只要 ROS 還在跑就一直迴圈（直到 Ctrl+C 或 shutdown）。"><span class="m">228</span>      while executor.context.ok():
 <span class="m">229</span>          executor.spin_once()</span></pre>
 
-<p>and <code>spin_once()</code> of the single-threaded executor is steps ①, ② and ③ of the figure in Part 2:</p>
+<p lang="en">and <code>spin_once()</code> of the single-threaded executor is steps ①, ② and ③ of the figure in Part 2:</p>
+<p lang="zh-Hant">而 single-threaded executor 的 <code>spin_once()</code>，就是第 2 部分圖裡的步驟 ①、②、③：</p>
 
 <pre data-lang="py"><span class="m"># rclpy/executors.py, SingleThreadedExecutor</span>
-<span class="hl" data-note="Steps 1 and 2: wait until something is ready, and take one ready callback."><span class="m">797</span>              handler, entity, node = self.wait_for_ready_callbacks(timeout_sec=timeout_sec)</span>
+<span class="hl" data-note="Steps 1 and 2: wait until something is ready, and take one ready callback." data-note-zh="步驟 1 和 2：等到有東西準備好，拿一個準備好的 callback。"><span class="m">797</span>              handler, entity, node = self.wait_for_ready_callbacks(timeout_sec=timeout_sec)</span>
 <span class="m">798</span>          except ShutdownException:
 ...
-<span class="hl" data-note="Step 3: run it, on this thread, until it returns."><span class="m">803</span>              handler()</span></pre>
+<span class="hl" data-note="Step 3: run it, on this thread, until it returns." data-note-zh="步驟 3：在這條執行緒上跑它，直到它 return。"><span class="m">803</span>              handler()</span></pre>
 
-<p>And here is <code>call()</code>. <mark><code>call()</code> is just <code>call_async()</code> plus a wait.</mark></p>
+<p lang="en">And here is <code>call()</code>. <mark><code>call()</code> is just <code>call_async()</code> plus a wait.</mark></p>
+<p lang="zh-Hant">再來是 <code>call()</code>。<mark><code>call()</code> 就是 <code>call_async()</code> 加上一個等待。</mark></p>
 
 <pre data-lang="py"><span class="m"># rclpy/client.py</span>
-<span class="hl" data-note="An Event: a flag that one thread can wait on and another can set."><span class="m">84</span>          event = threading.Event()</span>
+<span class="hl" data-note="An Event: a flag that one thread can wait on and another can set." data-note-zh="Event：一個旗標，一條執行緒可以等它，另一條可以把它設起來。"><span class="m">84</span>          event = threading.Event()</span>
 <span class="m">85</span>
-<span class="hl" data-note="A done callback that sets the flag. It runs when the reply is handled, and only the executor can run it."><span class="m">86</span>          def unblock(future):
+<span class="hl" data-note="A done callback that sets the flag. It runs when the reply is handled, and only the executor can run it." data-note-zh="設旗標的 done callback。回覆被處理時才會跑，而且只有 executor 能跑它。"><span class="m">86</span>          def unblock(future):
 <span class="m">87</span>              nonlocal event
 <span class="m">88</span>              event.set()</span>
 <span class="m">89</span>
-<span class="hl" data-note="The same call_async() as Fix 1, with unblock as its done callback."><span class="m">90</span>          future = self.call_async(request)
+<span class="hl" data-note="The same call_async() as Fix 1, with unblock as its done callback." data-note-zh="跟修法 1 一樣的 call_async()，用 unblock 當 done callback。"><span class="m">90</span>          future = self.call_async(request)
 <span class="m">91</span>          future.add_done_callback(unblock)</span>
 ...
-<span class="hl" data-note="Line 97: the thread that called call() sleeps here until unblock() sets the flag. Inside a callback, that thread is the executor's only thread, so unblock() never runs."><span class="m">96</span>          if not future.done():
+<span class="hl" data-note="Line 97: the thread that called call() sleeps here until unblock() sets the flag. Inside a callback, that thread is the executor's only thread, so unblock() never runs." data-note-zh="第 97 行：呼叫 call() 的執行緒在這裡睡著，直到 unblock() 把旗標設起來。在 callback 裡，那條執行緒就是 executor 唯一的執行緒，所以 unblock() 永遠不會跑。"><span class="m">96</span>          if not future.done():
 <span class="m">97</span>              event.wait()</span></pre>
 
-<p>Put the pieces together. <code>unblock()</code> is a done callback, so the executor's thread must run it. That thread is asleep on line 97, waiting for <code>unblock()</code>. Now read the traceback you kept from the Try-it box. It lists the calls from the outside in, and the last lines show where the thread was when you pressed Ctrl+C:</p>
+<p lang="en">Put the pieces together. <code>unblock()</code> is a done callback, so the executor's thread must run it. That thread is asleep on line 97, waiting for <code>unblock()</code>. Now read the traceback you kept from the Try-it box. It lists the calls from the outside in, and the last lines show where the thread was when you pressed Ctrl+C:</p>
+<p lang="zh-Hant">把這些拼起來。<code>unblock()</code> 是 done callback，所以必須由 executor 的執行緒來跑。而那條執行緒正睡在第 97 行，等 <code>unblock()</code>。現在讀你在「動手試」留下的 traceback。它由外往內列出呼叫，最後幾行就是你按 Ctrl+C 時執行緒停在哪裡：</p>
 
 <pre class="term"><span class="m">  File "/code/blocking_client.py", line 27, in main</span>
     rclpy.spin(BlockingClient())
@@ -266,34 +312,38 @@ cd /code &amp;&amp; python3 slow_server.py</pre>
 <span class="m">  ...</span>
 KeyboardInterrupt</pre>
 
-<p>Read it from the top: <code>spin</code> ran <code>handler()</code> (step ③), the handler was our timer callback <code>ask</code>, <code>ask</code> called <code>call()</code>, and <code>call()</code> sat on line 97. A traceback of a frozen program tells you exactly where it is stuck. This works for any hanging Python node, not only this bug. <code>py-spy dump --pid &lt;PID&gt;</code> prints the same picture without stopping the program.</p>
+<p lang="en">Read it from the top: <code>spin</code> ran <code>handler()</code> (step ③), the handler was our timer callback <code>ask</code>, <code>ask</code> called <code>call()</code>, and <code>call()</code> sat on line 97. A traceback of a frozen program tells you exactly where it is stuck. This works for any hanging Python node, not only this bug. <code>py-spy dump --pid &lt;PID&gt;</code> prints the same picture without stopping the program.</p>
+<p lang="zh-Hant">從上往下讀：<code>spin</code> 跑了 <code>handler()</code>（步驟 ③），handler 是我們的 timer callback <code>ask</code>，<code>ask</code> 呼叫了 <code>call()</code>，<code>call()</code> 停在第 97 行。卡住的程式，它的 traceback 會告訴你它卡在哪一行。這招適用於任何卡住的 Python node，不只這個 bug。<code>py-spy dump --pid &lt;PID&gt;</code> 可以在不停止程式的情況下印出同樣的資訊。</p>
 
 <div class="case">
-  <div class="case-h">Real world</div>
-  <div class="case-t">The warning was in the docs all along</div>
-  <p>The first lines of <code>call()</code>'s own documentation say: <i>"Do not call this method in a callback or a deadlock may occur."</i> The C++ API has the same trap: <code>future.wait()</code> or <code>spin_until_future_complete()</code> inside a callback freezes the node in the same way. In our test, Ctrl+C could not stop the C++ version; it needed Ctrl+\ (SIGQUIT).</p>
-  <p class="src">Sources: <code>rclpy/client.py</code> in ROS 2 Humble, <code>Client.call</code>; the C++ test is in <code>ros2-basics/verify/README.md</code> in this repository.</p>
+  <div class="case-h"><span lang="en">Real world</span><span lang="zh-Hant">真實案例</span></div>
+  <div class="case-t"><span lang="en">The warning was in the docs all along</span><span lang="zh-Hant">警告一直都寫在文件裡</span></div>
+  <p lang="en">The first lines of <code>call()</code>'s own documentation say: <i>"Do not call this method in a callback or a deadlock may occur."</i> The C++ API has the same trap: <code>future.wait()</code> or <code>spin_until_future_complete()</code> inside a callback freezes the node in the same way. In our test, Ctrl+C could not stop the C++ version; it needed Ctrl+\ (SIGQUIT).</p>
+  <p lang="zh-Hant"><code>call()</code> 自己的文件開頭就寫著：<i>"Do not call this method in a callback or a deadlock may occur."</i>（不要在 callback 裡呼叫這個方法，否則可能死結。）C++ API 也有一樣的陷阱：在 callback 裡 <code>future.wait()</code> 或 <code>spin_until_future_complete()</code> 會用同樣的方式卡住 node。我們測試時，C++ 版本按 Ctrl+C 停不下來，要按 Ctrl+\（SIGQUIT）。</p>
+  <p class="src" lang="en">Sources: <code>rclpy/client.py</code> in ROS 2 Humble, <code>Client.call</code>; the C++ test is in <code>ros2-basics/verify/README.md</code> in this repository.</p>
+  <p class="src" lang="zh-Hant">來源：ROS 2 Humble 的 <code>rclpy/client.py</code>，<code>Client.call</code>；C++ 的測試在本 repo 的 <code>ros2-basics/verify/README.md</code>。</p>
 </div>
 
 <!-- ============================================================ -->
-<h2 id="takehome"><small>Take home</small>What you can now explain</h2>
-<p>Tick each one you could explain to a teammate without looking at this page.</p>
+<h2 id="takehome"><small><span lang="en">Take home</span><span lang="zh-Hant">帶回家</span></small><span lang="en">What you can now explain</span><span lang="zh-Hant">你現在能解釋的事</span></h2>
+<p lang="en">Tick each one you could explain to a teammate without looking at this page.</p>
+<p lang="zh-Hant">不看這一頁也能跟隊友解釋清楚的，就打勾。</p>
 <ul class="goals">
-  <li>I can say what an executor does, in one sentence.</li>
-  <li>I can say how many callbacks a SingleThreadedExecutor runs at once, and what that means for a slow callback.</li>
-  <li>I can explain why <code>call()</code> inside a callback never returns on a single-threaded executor, and why the other timers stop too.</li>
-  <li>I can fix it with <code>call_async()</code> and a done callback.</li>
-  <li>I can explain what a callback group is, and fix the freeze with a MultiThreadedExecutor.</li>
-  <li class="deeper">I can read the traceback of a frozen Python node and find the line where it waits.</li>
+  <li><span lang="en">I can say what an executor does, in one sentence.</span><span lang="zh-Hant">我能用一句話說出 executor 在做什麼。</span></li>
+  <li><span lang="en">I can say how many callbacks a SingleThreadedExecutor runs at once, and what that means for a slow callback.</span><span lang="zh-Hant">我能說出 SingleThreadedExecutor 一次跑幾個 callback，以及這對慢的 callback 代表什麼。</span></li>
+  <li><span lang="en">I can explain why <code>call()</code> inside a callback never returns on a single-threaded executor, and why the other timers stop too.</span><span lang="zh-Hant">我能解釋為什麼在 single-threaded executor 上，callback 裡的 <code>call()</code> 永遠不會 return，以及為什麼其他 timer 也會停。</span></li>
+  <li><span lang="en">I can fix it with <code>call_async()</code> and a done callback.</span><span lang="zh-Hant">我能用 <code>call_async()</code> 和 done callback 修好它。</span></li>
+  <li><span lang="en">I can explain what a callback group is, and fix the freeze with a MultiThreadedExecutor.</span><span lang="zh-Hant">我能解釋 callback group 是什麼，並用 MultiThreadedExecutor 修好這個卡住的問題。</span></li>
+  <li class="deeper"><span lang="en">I can read the traceback of a frozen Python node and find the line where it waits.</span><span lang="zh-Hant">我能讀懂卡住的 Python node 的 traceback，找到它在等的那一行。</span></li>
 </ul>
 
-<h2 id="credits" data-map="no"><small>Attribution</small>Credits</h2>
+<h2 id="credits" data-map="no"><small><span lang="en">Attribution</span><span lang="zh-Hant">出處</span></small><span lang="en">Credits</span><span lang="zh-Hant">致謝</span></h2>
 <ul class="credits">
-  <li>The code is in <code>code/</code>. It was run on ROS 2 Humble (<code>ros:humble-ros-base-jammy</code> with <code>example_interfaces</code>) on 2026-11-16, and the logs above are from that run.</li>
-  <li>The rclpy excerpts are from ROS 2 Humble (Apache License 2.0).</li>
+  <li><span lang="en">The code is in <code>code/</code>. It was run on ROS 2 Humble (<code>ros:humble-ros-base-jammy</code> with <code>example_interfaces</code>) on 2026-11-16, and the logs above are from that run.</span><span lang="zh-Hant">程式碼在 <code>code/</code>。2026-11-16 在 ROS 2 Humble（<code>ros:humble-ros-base-jammy</code> 加 <code>example_interfaces</code>）上執行，上面的 log 都來自那次執行。</span></li>
+  <li><span lang="en">The rclpy excerpts are from ROS 2 Humble (Apache License 2.0).</span><span lang="zh-Hant">rclpy 節錄自 ROS 2 Humble（Apache License 2.0）。</span></li>
 </ul>
 
-<footer class="ws-foot">DIT Robotics · Software courses · Example worksheet</footer>
+<footer class="ws-foot"><span lang="en">DIT Robotics · Software courses · Example worksheet</span><span lang="zh-Hant">DIT Robotics · 軟體課程 · 範例學習單</span></footer>
 </div>
 <script src="../assets/worksheet.js"></script>
 </body>

@@ -1,16 +1,22 @@
 /* walk.js: the step engine for every DIT walkthrough. No build step, no dependencies.
 
-   Load this file FIRST, then the page's own <script>. The engine starts when the page has loaded.
+   Load assets/lang.js in <head>, then this file, then the page's own <script>. The engine starts
+   when the page has loaded.
 
-   The page gives <body class="walk" data-title="..." data-sub="..." data-back="../index.html#part3">
+   The page gives <body class="walk" data-title="..." data-title-zh="..." data-sub="..."
+   data-sub-zh="..." data-back="../index.html#part3">
    and a <main> with its own panels. walk.js adds the header, the progress bar, the footer and the
    arrow layer. The page's script defines:
 
      initialState()            -> the model s: plain data that describes the whole picture
      STEPS = [{ part, title, narr, apply(s) -> H }]
+     PARTS = { A: { title, kind, intro }, ... }   the sections; a step's part is a key of PARTS.
+        kind is 'before' (the normal run, before the bug shows up), 'bug', 'fix' or 'recap'. It colours the section bar under the header,
+        the progress bar and the header label, so the room sees at once when the story moves
+        from the bug to the fix. intro is one line shown in the section bar.
+        (Without PARTS, part is shown as plain text and has no colour.)
      renderPanels(s, H)        draws every panel from s (and nothing else)
      structuralArrows(s, H)    optional: arrows that follow from the model; return arrow(...) strings
-     GUESSES = { id: { q, choices: [...], right: index, answer } }   optional
 
    H says what this step points at:
      { hot: [ids], arrows: [[fromId, toId, cls, label]], call: { who, act, ret, bad, note } }
@@ -19,7 +25,10 @@
    To show step i, the engine runs apply() for steps 0..i on a fresh initialState(). So the
    panels always agree with the model, and any step opens directly from its URL (page.html#7).
 
-   Keys: → Space PageDown next · ← PageUp back · Home End · E explanation.
+   Every text a reader sees is in English and Chinese: write it as T('English', '中文') (lang.js).
+   An arrow label can be ['English', '中文'].
+
+   Keys: → Space PageDown next · ← PageUp back · Home End · E explanation · L English/中文.
    (Presentation clickers send PageUp and PageDown, so a clicker works too.) */
 
 /* ---------- helpers a page can use ---------- */
@@ -27,12 +36,12 @@ const $ = (id) => document.getElementById(id);
 const esc = (t) => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
 const ACTORS = {
-  a:    { label: 'your node',    color: 'var(--a)' },
-  b:    { label: 'other node',   color: 'var(--b)' },
-  exec: { label: 'executor',     color: 'var(--exec)' },
-  mw:   { label: 'DDS',          color: 'var(--mw)' },
-  os:   { label: 'Linux kernel', color: 'var(--os)' },
-  hw:   { label: 'hardware',     color: 'var(--hw)' },
+  a:    { label: T('your node', '你的 node'),      color: 'var(--a)' },
+  b:    { label: T('other node', '另一個 node'),   color: 'var(--b)' },
+  exec: { label: 'executor',                       color: 'var(--exec)' },
+  mw:   { label: 'DDS',                            color: 'var(--mw)' },
+  os:   { label: T('Linux kernel', 'Linux 核心'), color: 'var(--os)' },
+  hw:   { label: T('hardware', '硬體'),           color: 'var(--hw)' },
 };
 /* an actor chip for titles and narration: actor('exec', 'The executor') */
 const actor = (k, label) => `<span class="actor ${k}">${label || ACTORS[k].label}</span>`;
@@ -94,27 +103,13 @@ const kv = (rows) => `<div class="kv">${rows.map(r => `<span class="k">${r.k}</s
 /* a panel with a header: panel('thread', 'The thread', 'one per executor', html) */
 const panel = (id, title, sub, body) => `<div class="panel" id="${id}"><div class="ph">${title}<small>${sub || ''}</small></div><div class="pb">${body}</div></div>`;
 
-/* The guess card. Ask on one step (guessCard(id)), reveal on a later one (guessCard(id, true)).
-   The reader's pick is kept for this browser session, so going back and forth keeps it. */
-const guessKey = (id) => 'dit-guess:' + location.pathname + ':' + id;
-function guessPick(id) { try { const v = sessionStorage.getItem(guessKey(id)); return v == null ? -1 : +v; } catch (e) { return -1; } }
-function guessCard(id, reveal) {
-  const G = GUESSES[id], p = guessPick(id);
-  if (!reveal) {
-    return `<div class="guess" id="guess-${id}"><span class="gh">Your guess</span><p>${G.q}</p><div class="opts">${G.choices.map((c, i) =>
-      `<button type="button" data-g="${id}" data-i="${i}" class="${p === i ? 'pick' : ''}">${c}</button>`).join('')}</div>
-      <div class="gn">${p < 0 ? 'Pick one, then press Next ▶.' : 'Now press Next ▶ and watch.'}</div></div>`;
-  }
-  const head = p < 0 ? 'You did not guess.' : p === G.right ? '✓ Your guess was right.' : '✗ Not what you guessed.';
-  return `<div class="guess done" id="guess-${id}"><span class="gh">Your guess</span> <span class="gn">${head}</span><br>
-    <span class="ans right"><small>answer</small>${G.answer || G.choices[G.right]}</span>${p >= 0 && p !== G.right ? `<span class="ans wrong"><small>your guess</small>${G.choices[p]}</span>` : ''}</div>`;
+/* ---------- sections ---------- */
+const KINDS = { before: T('Before the bug', '問題出現前'), bug: T('The bug', '問題'), fix: T('The fix', '修正'), recap: T('Recap', '重點回顧') };
+function partInfo(st) {
+  const P = typeof PARTS === 'object' && PARTS ? PARTS[st.part] : null;
+  if (!P) return { key: '', label: st.part || '', kind: '', intro: '' };
+  return { key: st.part, label: (/^[A-Z]$/.test(st.part) && P.kind !== 'recap' ? st.part + ' · ' : '') + P.title, kind: P.kind || '', intro: P.intro || '', tag: P.tag || KINDS[P.kind] || '' };
 }
-document.addEventListener('click', (ev) => {
-  const b = ev.target.closest && ev.target.closest('.guess button[data-g]'); if (!b) return;
-  try { sessionStorage.setItem(guessKey(b.dataset.g), b.dataset.i); } catch (e) {}
-  b.parentElement.querySelectorAll('button').forEach(x => x.classList.toggle('pick', x === b));
-  const gn = b.closest('.guess').querySelector('.gn'); if (gn) gn.textContent = 'Now press Next ▶ and watch.';
-});
 
 /* ---------- arrows between two elements, by id ---------- */
 function anchor(r, side) {
@@ -145,6 +140,7 @@ function arrow(fromId, toId, cls, label) {
     end = { x: p3.x, y: p3.y - d * 10 }; c1 = { x: p0.x, y: p0.y + k }; c2 = { x: end.x, y: end.y - k };
     head = `${p3.x},${p3.y} ${p3.x - hw},${p3.y - d * 12} ${p3.x + hw},${p3.y - d * 12}`;
   }
+  if (Array.isArray(label)) label = L(label[0], label[1]);
   const c = cls || 'flow';
   let out = `<path class="${c}" d="M${p0.x},${p0.y} C${c1.x},${c1.y} ${c2.x},${c2.y} ${end.x},${end.y}"/><polygon class="${c}" points="${head}"/>`;
   if (label) {
@@ -163,19 +159,23 @@ function arrow(fromId, toId, cls, label) {
   function buildChrome() {
     const b = document.body;
     const header = document.createElement('header');
-    header.innerHTML = `${b.dataset.back ? `<a class="back" href="${b.dataset.back}">← Worksheet</a>` : ''}
-      <div class="title">${b.dataset.title || document.title}${b.dataset.sub ? `<span>${b.dataset.sub}</span>` : ''}</div>
-      <div class="stepno"><span class="part" id="part"></span> · step <b id="stepno">1</b> / <span id="steptotal"></span></div>
-      <nav><button id="explain" type="button" title="Show or hide the explanation (E)"></button>
-        <button id="prev" type="button" title="← or PageUp">◀ Prev</button>
-        <button id="next" type="button" title="→, Space or PageDown">Next ▶</button></nav>`;
+    const both = (k) => b.dataset[k] ? T(b.dataset[k], b.dataset[k + 'Zh'] || b.dataset[k]) : '';
+    header.innerHTML = `${b.dataset.back ? `<a class="back" href="${b.dataset.back}">${T('← Worksheet', '← 學習單')}</a>` : ''}
+      <div class="title">${both('title') || document.title}${b.dataset.sub ? `<span class="sub">${both('sub')}</span>` : ''}</div>
+      <div class="stepno"><span class="part" id="part"></span> · ${T('step', '步驟')} <b id="stepno">1</b> / <span id="steptotal"></span></div>
+      <nav><button id="explain" type="button" title="E"></button>
+        <button id="prev" type="button" title="← PageUp">${T('◀ Prev', '◀ 上一步')}</button>
+        <button id="next" type="button" title="→ Space PageDown">${T('Next ▶', '下一步 ▶')}</button></nav>`;
+    if (window.DIT && DIT.langButton) header.querySelector('nav').prepend(DIT.langButton());
     const bar = document.createElement('div'); bar.className = 'progress'; bar.id = 'bar';
-    bar.innerHTML = STEPS.map((st, k) => `<i data-k="${k}" class="${k > 0 && st.part !== STEPS[k - 1].part ? 'sec' : ''}" title="Step ${k + 1}: ${esc(st.part)}"></i>`).join('');
+    bar.innerHTML = STEPS.map((st, k) => { const p = partInfo(st);
+      return `<i data-k="${k}" class="k-${p.kind} ${k > 0 && st.part !== STEPS[k - 1].part ? 'sec' : ''}" title="${k + 1}"></i>`; }).join('');
     bar.onclick = (ev) => { const k = ev.target.dataset && ev.target.dataset.k; if (k != null) go(+k); };
     const footer = document.createElement('footer'); footer.innerHTML = '<div class="call" id="call"></div><div class="narr" id="narr"></div>';
     const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); svg.id = 'arrows';
     const main = document.querySelector('main');
-    b.insertBefore(header, main); b.insertBefore(bar, main); main.after(footer); b.append(svg);
+    const sec = document.createElement('div'); sec.className = 'section'; sec.id = 'section';
+    b.insertBefore(header, main); b.insertBefore(bar, main); b.insertBefore(sec, main); main.after(footer); b.append(svg);
     $('prev').onclick = () => go(current - 1);
     $('next').onclick = () => go(current + 1);
     $('explain').onclick = () => setExplain(!explain);
@@ -197,9 +197,9 @@ function arrow(fromId, toId, cls, label) {
   function renderCall(c) {
     if (!c) return '';
     const who = typeof c.who === 'string' ? ACTORS[c.who] : (c.who || ACTORS.exec);
-    let out = `<span class="who" style="--c:${who.color}">${esc(who.label)}</span>`;
+    let out = `<span class="who" style="--c:${who.color}">${who.label}</span>`;
     if (c.act) out += `<span class="act">${esc(c.act)}</span>`;
-    if (c.ret) out += `<span class="ret ${c.bad ? 'bad' : ''}">${esc(c.ret)}</span>`;
+    if (c.ret) out += `<span class="ret ${c.bad ? 'bad' : ''}">${c.ret}</span>`;   // HTML: may be T(...)
     if (c.note) out += `<span class="note">${c.note}</span>`;
     return out;
   }
@@ -215,13 +215,20 @@ function arrow(fromId, toId, cls, label) {
     const st = STEPS[current];
     $('call').innerHTML = renderCall(H.call);
     const body = st.narr.trim();
-    $('narr').innerHTML = `<h3>${st.title}</h3>${/^<(ul|ol|table|p)\b/.test(body) ? body : '<p>' + body + '</p>'}`;
-    $('part').textContent = st.part;
+    const hint = `<span class="hint">${T('press E for the explanation', '按 E 看說明')}</span>`;
+    $('narr').innerHTML = `<h3>${st.title}${hint}</h3>${/^<(ul|ol|table|p|div)\b/.test(body) ? body : '<p>' + body + '</p>'}`;
+    const p = partInfo(st), entering = current === 0 || st.part !== STEPS[current - 1].part;
+    $('part').innerHTML = p.label; $('part').className = 'part k-' + p.kind;
+    document.body.dataset.kind = p.kind;
+    const sec = $('section');
+    sec.innerHTML = p.kind ? `<span class="sk">${p.tag}</span><b>${p.label}</b>${p.intro ? `<span class="si">${p.intro}</span>` : ''}` : '';
+    sec.className = 'section k-' + p.kind;
+    if (entering && p.kind && current > 0) { void sec.offsetWidth; sec.classList.add('enter'); }
     $('stepno').textContent = current + 1; $('steptotal').textContent = STEPS.length;
     [...$('bar').children].forEach((el, k) => { el.classList.toggle('done', k < current); el.classList.toggle('cur', k === current); });
     $('prev').disabled = current === 0; $('next').disabled = current === STEPS.length - 1;
     document.querySelector('body > footer').classList.toggle('collapsed', !explain);
-    const tb = $('explain'); tb.textContent = explain ? 'Hide explanation' : 'Explain (E)'; tb.setAttribute('aria-pressed', explain ? 'true' : 'false');
+    const tb = $('explain'); tb.innerHTML = explain ? T('Hide explanation', '隱藏說明') : T('Explain (E)', '說明 (E)'); tb.setAttribute('aria-pressed', explain ? 'true' : 'false');
     const h3 = document.querySelector('#narr h3'); if (h3 && !explain) h3.onclick = () => setExplain(true);
     drawArrows();
   }
@@ -249,8 +256,10 @@ function arrow(fromId, toId, cls, label) {
       else if (ev.key === 'Home') go(0);
       else if (ev.key === 'End') go(STEPS.length - 1);
       else if (ev.key === 'e' || ev.key === 'E') setExplain(!explain);
+      else if ((ev.key === 'l' || ev.key === 'L') && window.DIT) DIT.toggleLang();
     });
     window.addEventListener('resize', drawArrows);
+    document.addEventListener('dit-lang', () => requestAnimationFrame(drawArrows));
     document.addEventListener('scroll', drawArrows, true);
     window.addEventListener('hashchange', () => {
       const want = (parseInt(location.hash.slice(1), 10) || 1) - 1;

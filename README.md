@@ -5,6 +5,28 @@ eight introductory courses plus a debug clinic. This file is for whoever writes 
 
 Open any page directly in a browser. Nothing needs building, and the pages work offline.
 
+## Languages
+
+Every page is in **English and Traditional Chinese (繁體中文)**. English is the main text; a
+button on every page (or the L key) switches to Chinese, and the choice is remembered in that
+browser. A link can force one with `?lang=zh` or `?lang=en`.
+
+Both languages live in the same file, next to each other, so they are written and changed
+together:
+
+```html
+<p lang="en">The executor runs one callback at a time.</p>
+<p lang="zh-Hant">executor 一次只跑一個 callback。</p>
+```
+
+Anything without a `lang` shows in both: code, terminal output, numbers. In a walkthrough's
+script, write every visible text as `T('English', '中文')`. `assets/lang.js` does the work; every
+page loads it first, in `<head>`.
+
+Write the Chinese the way the club's ROS 2 tutorial does: plain and short, Taiwanese usage,
+full-width punctuation, and ROS terms left in English (node, callback, executor, timer, service,
+future), with 執行緒 for thread and 死結 for deadlock. Real output and code stay in English.
+
 ## What a course is
 
 A course is **one session of about 4 hours**, taught live, with **one worksheet**: a web page that
@@ -25,14 +47,15 @@ worksheets differ in what they aim for:
 
 So every worksheet has **two layers**:
 
-- **Core.** The numbered Parts that the session covers, each with a rough time. Together they
-  fill about 3 hours, which leaves the rest of the 4 for the hands-on, breaks and questions. A
-  member who only reads the core leaves with a correct mental model, and with no gaps they don't
-  know about.
+- **Core.** The numbered Parts that the session covers. Together they fill about 3 hours, which
+  leaves the rest of the 4 for the hands-on, breaks and questions. A member who only reads the
+  core leaves with a correct mental model, and with no gaps they don't know about.
+  **Times never appear on the page.** The timetable is for the presenter, in the course's
+  `SESSION.md` (see `_template/SESSION.md`).
 - **Go deeper.** Ideas that matter but take time to sink in: the real source code, the edge
   cases, the reason the design is the way it is. They are written with the same care as the
   core, not as footnotes. They sit in `details.deeper` boxes, or in whole Parts marked as Go
-  deeper, and they are not counted in the session time. Members come back to them after the
+  deeper, and they are not in the session plan. Members come back to them after the
   session, or on the day they hit the problem for real.
 
 ## How a worksheet teaches
@@ -48,8 +71,8 @@ them.
    The reader learns the setup once.
 3. **Show the simple idea first, and let it fail.** Give the design as an answer to a problem
    the reader has just seen.
-4. **Ask before telling.** "Think first" cards, a guess inside each walkthrough, and "say what
-   you expect" before every command in a Try-it box.
+4. **Ask before telling.** "Think first" cards, a pause before each walkthrough step while its
+   explanation is still hidden, and "say what you expect" before every command in a Try-it box.
 5. **Name who acts.** Your node, the executor, DDS, the kernel, the hardware: each has one fixed
    colour, used the same way in chips, figures and walkthroughs (see `assets/worksheet.css`).
 6. **Real output, real code, real numbers.** Run every example and paste what it printed. Quote
@@ -69,14 +92,16 @@ courses/
 ├── PLAN.md            what each course covers and why
 ├── index.html         home page: every course
 ├── assets/            shared look and behaviour (no build step)
+│   ├── lang.js                         English / 中文 switch, loaded by every page
 │   ├── worksheet.css  worksheet.js     the worksheet page
 │   └── walk.css       walk.js          the walkthrough engine
 ├── _template/         a complete example course: copy it to start one
 │   ├── index.html     the worksheet
+│   ├── SESSION.md     the presenter's timetable (not shown to members)
 │   ├── walk/          its walkthroughs, one page each
 │   └── code/          every example, tested
 ├── ros2-basics/       additions to the club's Notion ROS 2 tutorial (in 繁體中文, pasted into Notion)
-└── <course>/          one folder per course: index.html, walk/, code/, img/
+└── <course>/          one folder per course: index.html, SESSION.md, walk/, code/, img/
 ```
 
 Course folders use the names from `PLAN.md`: `os-1`, `os-2`, `networking`, `state-estimation`,
@@ -93,8 +118,7 @@ page, and change it only in `assets/`.
   change `--sig` and its tints at the top of `worksheet.css` and `walk.css`.
 - **A navy rail on the left** holds the session map and marks the Part the reader is in. On a
   narrow screen it becomes a card under the masthead.
-- **Questions are white cards with a navy outline**: "Before you read on", "Think, then click",
-  the guess in a walkthrough. Dark fills are kept for the rail, the walkthrough header and
+- **Questions are white cards with a navy outline**: "Before you read on" and "Think, then click". Dark fills are kept for the rail, the walkthrough header and
   terminal output, so a page never has many dark blocks at once.
 - **Labels are small, monospace and uppercase.** Boxes are flat, with a thin line and a colour
   bar on the left: teal for "On a robot", green for "Try it", dashed purple for "Go deeper".
@@ -107,8 +131,8 @@ Start from [`_template/index.html`](_template/index.html). Its pieces:
 | Piece | Markup | Use it for |
 |---|---|---|
 | Masthead | `.kicker`, `h1`, `.lead`, `.howto` | what the session does, in 3 sentences; keep the `.howto` text |
-| Session map | `<nav class="map" data-home="../index.html"></nav>` | filled in from the Parts; shows times and the core total, and follows the reader |
-| Part | `<h2 id="..."><small>Part 2 · 25 min</small>Title</h2>` | one idea; the time feeds the map |
+| Session map | `<nav class="map" data-home="../index.html"></nav>` | filled in from the Parts; follows the reader |
+| Part | `<h2 id="..."><small>Part 2 / 第 2 部分</small>Title / 標題</h2>` (each in its `lang` span) | one idea; no time |
 | Go deeper Part | `<h2 id="..." class="deeper"><small>Part 5 · Go deeper</small>…` | a whole Part to read later |
 | Go deeper box | `<details class="deeper"><summary>Go deeper: …</summary>` | one deep idea inside a core Part |
 | Before you read on | `.think` | a question whose answer comes later in the worksheet |
@@ -119,7 +143,7 @@ Start from [`_template/index.html`](_template/index.html). Its pieces:
 | Try it | `.try` | hands-on in the container; ask for a prediction before each run |
 | Actor chip | `<span class="who exec">executor</span>` | `a`, `b`, `exec`, `mw`, `os`, `hw` |
 | Code | `<pre data-lang="py">` (or `cpp`, `sh`) | coloured automatically |
-| Code note | `<span class="hl" data-note="...">lines</span>` inside a `pre` | a one-sentence note on hover |
+| Code note | `<span class="hl" data-note="..." data-note-zh="...">lines</span>` inside a `pre` | a one-sentence note on hover |
 | Terminal | `<pre class="term">` with `.m`, `.a`, `.b`, `.ok`, `.cm` spans | real output |
 | Figure | inline `<svg class="fig" role="img" aria-label="...">` in `figure.wide` | drawn on white, actor colours |
 | Take home | `<ul class="goals"><li>I can …</li></ul>` (`li.deeper` for Go deeper items) | what to be able to explain |
@@ -140,19 +164,28 @@ Copy [`_template/walk/blocking-call.html`](_template/walk/blocking-call.html). T
 (`assets/walk.js`, documented at its top) asks the page for four things:
 
 - `initialState()`: the **model**, plain data describing the whole picture.
-- `STEPS`: each step has a `part` (sections like `A · The loop works`), a `title` that starts
+- `STEPS`: each step has a `part` (a key of `PARTS`, below), a `title` that starts
   with who acts, a `narr`, and an `apply(s)` that changes the model and returns what to point at:
   `hot` ids, `arrows`, and a `call` line (`who`, `act`, `ret`, `note`).
 - `renderPanels(s, H)`: draws every panel from the model, and nothing else.
-- `GUESSES` (optional): one guess card, asked on one step and revealed on a later one.
+- `PARTS`: the sections of the story, keyed by the step's `part` (`A`, `B`, `C`, `R`). Each has
+  a `title`, a `kind` and a one-line `intro`. Kinds: `before` (the normal run, before the bug
+  shows up: the bug is already in the code), `bug`, `fix`, `recap`. The kind colours a
+  bar under the header (teal, red, green, navy), the progress bar and the header label, and the
+  bar flashes on the first step of a new section, so nobody misses the move from the bug to the
+  fix. Say in the intro what changed: "same moment, new code".
 
 The engine shows step N by running `apply()` for steps 1 to N on a fresh model, so the panels
-can't drift from the story. Helpers: `listing()` for code with real line numbers (coloured by the file name's extension), `panel()`,
-`kv()`, `actor()`, `guessCard()`.
+can't drift from the story. Helpers: `listing()` for code with real line numbers (coloured by
+the file name's extension), `panel()`, `kv()`, `actor()`, and `T()` / `L()` from `lang.js`.
+Every text a reader sees is `T('English', '中文')`; an arrow label is `['English', '中文']`.
 
-Shape every walkthrough the same way: first the case that works, then where it breaks (with a
-guess before the break), then the fix if there is one, and a last step titled "What you should
-have seen" that recaps in 4–6 bullets.
+Shape every walkthrough the same way: first the normal run, before the bug shows up, then where it breaks (the
+presenter stops before the break and asks the room what happens next), then the fix if there is
+one, and a last step titled "What you should have seen" that recaps in 4–6 bullets.
+
+Walkthroughs have no guess cards or other quiz widgets: they distract from the panels. Questions
+belong to the presenter, and the hidden explanation (E) gives them the moment to ask.
 
 ## Code
 

@@ -13,7 +13,7 @@
   --mw: #7b3fe4;   --mw-t: #efe7fd;
   --os: #6b6f76;   --os-t: #ecedef;
   --hw: #8a6500;   --hw-t: #f6edd0;
-  --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", Helvetica, Arial, sans-serif;
+  --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", Helvetica, Arial, "PingFang TC", "Noto Sans TC", "Noto Sans CJK TC", "Microsoft JhengHei", sans-serif;
   --mono: ui-monospace, "JetBrains Mono", "SF Mono", "Cascadia Code", Menlo, Consolas, "DejaVu Sans Mono", monospace;
   --r: 6px;
   font-size: 17px;
@@ -21,6 +21,10 @@
 @media (min-width: 1500px) { :root { font-size: 19px; } }
 @media (max-width: 1200px) { :root { font-size: 15px; } }
 * { box-sizing: border-box; }
+
+/* ---------- English / 中文 (lang.js) ---------- */
+html.zh [lang="en"]:not(html), html:not(.zh) [lang="zh-Hant"] { display: none !important; }
+html.zh .narr p { line-height: 1.7; }
 html, body { margin: 0; }
 body.walk { background: var(--bg); color: var(--ink); font-family: var(--sans); display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
 code, .mono { font-family: var(--mono); }
@@ -32,7 +36,7 @@ header .back { font: .72rem var(--mono); text-transform: uppercase; letter-spaci
                border: 1px solid rgba(255,255,255,.25); border-radius: 4px; padding: .3rem .55rem; }
 header .back:hover { color: #fff; border-color: #fff; }
 header .title { font-weight: 800; font-size: 1.1rem; letter-spacing: -.01em; }
-header .title span { color: #9fb0c2; font-weight: 400; margin-left: .6rem; font-size: .88rem; letter-spacing: 0; }
+header .title .sub { color: #9fb0c2; font-weight: 400; margin-left: .6rem; font-size: .88rem; letter-spacing: 0; }
 header .stepno { margin-left: auto; color: #9fb0c2; font: .78rem var(--mono); white-space: nowrap; }
 header .stepno b { color: #fff; }
 header .part { color: var(--sig-bright); font-weight: 700; }
@@ -44,6 +48,7 @@ header nav button:disabled { opacity: .3; cursor: default; }
 header nav button#next { background: var(--sig-bright); border-color: var(--sig-bright); color: var(--ink); }
 header nav button#next:hover { background: #7cf0e0; }
 header nav button#explain { font-weight: 500; color: #cfd8e3; }
+header nav button.langswitch { font-weight: 600; color: #cfd8e3; }
 header nav button#explain[aria-pressed="true"] { background: #fff; border-color: #fff; color: var(--ink); font-weight: 700; }
 /* one segment per step; a wider gap where a new section starts; click a segment to jump */
 .progress { display: flex; gap: 3px; background: var(--ink); padding: 0 1.1rem .55rem; flex: none; }
@@ -52,6 +57,36 @@ header nav button#explain[aria-pressed="true"] { background: #fff; border-color:
 .progress i.done { background: var(--sig); }
 .progress i.cur { background: #fff; }
 .progress i.sec { margin-left: 9px; }
+
+/* ---------- sections: what kind of part of the story this is ----------
+   before (the normal run, before the bug shows up): teal · bug: red · fix: green · recap: navy. walk.js sets the k-* classes from PARTS,
+   and body[data-kind] so a page can colour its own panels too. */
+.progress i.k-before { --kc: var(--sig); } .progress i.k-bug { --kc: #ff7a6e; }
+.progress i.k-fix { --kc: #5fd38d; } .progress i.k-recap { --kc: #9fb0c2; }
+.progress i[class*="k-"]:not(.k-) { background: var(--kc); opacity: .3; }   /* future steps: the section colour, dim */
+.progress i[class*="k-"].done { opacity: 1; }
+.progress i.cur { background: #fff !important; opacity: 1 !important; }
+header .part.k-bug { color: #ff8f84; } header .part.k-fix { color: #6fe09b; } header .part.k-recap { color: #fff; }
+.section { --k: var(--sig); --kt: var(--sig-t); display: flex; align-items: baseline; gap: .8rem; flex-wrap: wrap; flex: none;
+           padding: .45rem 1.1rem; background: var(--kt); border-bottom: 1px solid var(--line); box-shadow: inset 6px 0 0 var(--k); }
+.section:empty { display: none; }
+.section.k-bug { --k: var(--bad); --kt: var(--bad-t); }
+.section.k-fix { --k: var(--ok); --kt: var(--ok-t); }
+.section.k-recap { --k: var(--ink); --kt: var(--soft); }
+.section .sk { background: var(--k); color: #fff; font: 700 .66rem var(--mono); letter-spacing: .12em; text-transform: uppercase; padding: .2rem .55rem; border-radius: 4px; align-self: center; }
+.section b { font-size: 1.05rem; color: var(--k); }
+.section .si { color: var(--ink); font-size: .95rem; }
+.section .si code { font-family: var(--mono); background: rgba(255,255,255,.7); color: var(--ink); padding: 0 .3rem; border-radius: 3px; font-size: .9em; }
+/* the first step of a new section: the bar flashes so the room notices the switch */
+.section.enter { animation: enter 1.4s ease-out 1; }
+.section.enter .sk { animation: enterTag 1.4s ease-out 1; }
+@keyframes enter { 0%, 35% { background: var(--k); } 100% { background: var(--kt); } }
+.section.enter b, .section.enter .si { animation: enterText 1.4s ease-out 1; }
+@keyframes enterText { 0%, 35% { color: #fff; } 100% { color: var(--k); } }
+.section.enter .si { animation-name: enterSi; }
+@keyframes enterSi { 0%, 35% { color: #fff; } 100% { color: var(--ink); } }
+@keyframes enterTag { 0%, 35% { background: #fff; color: var(--k); } 100% { background: var(--k); color: #fff; } }
+@media (prefers-reduced-motion: reduce) { .section.enter, .section.enter .sk, .section.enter b, .section.enter .si { animation: none; } }
 
 /* ---------- main: the page sets grid-template-columns ---------- */
 body.walk > main { flex: 1; display: grid; gap: 1.1rem; padding: .8rem 1.1rem; min-height: 0; }
@@ -113,22 +148,6 @@ body.walk > main { flex: 1; display: grid; gap: 1.1rem; padding: .8rem 1.1rem; m
 .term .a { color: #8ab8ff; } .term .b { color: #ffab78; } .term .ok { color: var(--sig-bright); font-weight: 700; } .term .m { color: #9fb0c2; font-style: italic; }
 .term .ln.fresh { background: rgba(62,224,204,.13); box-shadow: -.75rem 0 0 rgba(62,224,204,.13), inset 0 0 0 0 transparent; }
 
-/* ---------- the guess card (walk.js guessCard()): outlined in navy, like every question ---------- */
-.guess { background: #fff; border: 1px solid var(--ink); border-radius: var(--r); padding: .55rem .8rem .65rem; }
-.guess .gh { font: 700 .62rem var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--sig-ink); }
-.guess p { margin: .3rem 0 .5rem; font-size: .95rem; line-height: 1.4; }
-.guess code { background: var(--soft); padding: 0 .3rem; border-radius: 3px; }
-.guess .opts { display: grid; grid-template-columns: repeat(auto-fit, minmax(7rem, 1fr)); gap: .35rem; }
-.guess button { font: inherit; font-size: .86rem; font-weight: 600; color: var(--ink); padding: .3rem .4rem; border: 1px solid var(--line); border-radius: 4px; background: #fff; cursor: pointer; }
-.guess button:hover { border-color: var(--ink); }
-.guess button.pick { border-color: var(--sig); background: var(--sig-t); }
-.guess .gn { font-size: .78rem; color: var(--muted); margin-top: .4rem; }
-.guess.done .gn { color: var(--ink); font-weight: 700; font-size: .9rem; margin-left: .5rem; }
-.guess .ans { display: inline-block; font-size: .86rem; border-radius: 4px; padding: .2rem .55rem; margin: .45rem .35rem 0 0; }
-.guess .ans small { font: 700 .58rem var(--mono); letter-spacing: .1em; text-transform: uppercase; margin-right: .4rem; }
-.guess .ans.right { background: var(--sig-t); font-weight: 700; } .guess .ans.right small { color: var(--sig-ink); }
-.guess .ans.wrong { background: var(--bad-t); } .guess .ans.wrong small { color: var(--bad); }
-
 /* ---------- footer: the call line and the explanation ---------- */
 body.walk > footer { background: #fff; border-top: 1px solid var(--line); box-shadow: 0 -6px 18px rgba(13,27,42,.06); padding: .7rem 1.1rem .9rem; display: grid; gap: .5rem; min-height: 9rem; flex: none; max-height: 40vh; overflow-y: auto; }
 .call { display: flex; align-items: center; gap: .8rem; flex-wrap: wrap; font-family: var(--mono); font-size: .95rem; }
@@ -150,7 +169,8 @@ body.walk > footer { background: #fff; border-top: 1px solid var(--line); box-sh
 footer.collapsed { min-height: 0; }
 footer.collapsed .narr > :not(h3) { display: none; }
 footer.collapsed .narr h3 { cursor: pointer; }
-footer.collapsed .narr h3::after { content: "press E for the explanation"; margin-left: .8rem; color: var(--muted); font: 400 .66rem var(--mono); text-transform: uppercase; letter-spacing: .1em; border: 1px solid var(--line); border-radius: 4px; padding: .15rem .45rem; vertical-align: middle; white-space: nowrap; }
+.narr h3 .hint { display: none; margin-left: .8rem; color: var(--muted); font: 400 .66rem var(--mono); text-transform: uppercase; letter-spacing: .1em; border: 1px solid var(--line); border-radius: 4px; padding: .15rem .45rem; vertical-align: middle; white-space: nowrap; }
+footer.collapsed .narr h3 .hint { display: inline-block; }
 
 /* ---------- arrows drawn over the page ---------- */
 #arrows { position: fixed; inset: 0; width: 100vw; height: 100vh; pointer-events: none; z-index: 3; }

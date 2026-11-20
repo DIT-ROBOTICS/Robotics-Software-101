@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>DIT Software Courses</title>
+<script src="assets/lang.js"></script>
 <link rel="stylesheet" href="assets/worksheet.css">
 </head>
 <body>
@@ -11,40 +12,44 @@
 
 <div class="masthead">
   <div>
-    <div class="kicker">DIT Robotics · Software team</div>
-    <h1>Software courses</h1>
-    <p class="lead">Eight introductory courses and one debug clinic. Each course is one live session of about 4 hours with one worksheet. Together they give you a map of the whole robot software stack: where each piece sits, what it assumes, and how it breaks.</p>
-    <p class="howto"><b>How the worksheets work.</b> The numbered Parts are what we do together in the session. Boxes and Parts marked <b>Go deeper</b> hold ideas that take longer to sink in, for after the session. Step-by-step walkthroughs open from the worksheet; use ← → and press E for the explanation.</p>
+    <div class="kicker"><span lang="en">DIT Robotics · Software team</span><span lang="zh-Hant">DIT Robotics · 軟體組</span></div>
+    <h1><span lang="en">Software courses</span><span lang="zh-Hant">軟體課程</span></h1>
+    <p class="lead" lang="en">Eight introductory courses and one debug clinic. Each course is one live session of about 4 hours with one worksheet. Together they give you a map of the whole robot software stack: where each piece sits, what it assumes, and how it breaks.</p>
+    <p class="lead" lang="zh-Hant">八堂入門課，加一場除錯工作坊。每堂課是一次約 4 小時的現場課程，配一份學習單。全部上完，你會有一張整個機器人軟體架構的地圖：每一塊在哪裡、它假設了什麼、它會怎麼壞掉。</p>
+    <p class="howto" lang="en"><b>How the worksheets work.</b> The numbered Parts are what we do together in the session. Boxes and Parts marked <b>Go deeper</b> hold ideas that take longer to sink in, for after the session. Step-by-step walkthroughs open from the worksheet; use ← → and press E for the explanation. Every page has a <b>中文</b> button, or press L.</p>
+    <p class="howto" lang="zh-Hant"><b>學習單怎麼用。</b>有編號的部分是課堂上一起做的。標成<b>延伸</b>的方塊和部分，放的是比較需要時間消化的觀念，課後再看。逐步解說從學習單開啟，用 ← → 前後移動，按 E 看說明。每一頁都有 <b>English</b> 按鈕可以切換語言，也可以按 L。</p>
   </div>
 </div>
 
-<nav class="map" aria-label="On this page" data-label="On this page" data-home="index.html"></nav>
+<nav class="map" aria-label="On this page" data-label="On this page" data-label-zh="這一頁" data-home="index.html"></nav>
 
-<h2 id="courses"><small>Courses</small>In the suggested order</h2>
+<h2 id="courses"><small><span lang="en">Courses</span><span lang="zh-Hant">課程</span></small><span lang="en">In the suggested order</span><span lang="zh-Hant">建議的順序</span></h2>
 <table class="t courses">
-  <tr><th>Course</th><th>You leave knowing</th><th></th></tr>
-  <tr><td>OS‑1: Files and Processes</td><td>why a node is a Linux process, and what permissions, signals and libraries mean for it</td><td class="soon">in preparation</td></tr>
-  <tr><td>OS‑2: Memory, Concurrency and Devices</td><td>how threads, executors and interrupts work, and why nodes deadlock</td><td class="soon">in preparation</td></tr>
-  <tr><td>Networking &amp; Virtualization</td><td>how ROS 2 finds other nodes over the network, and why Docker and campus Wi‑Fi get in the way</td><td class="soon">in preparation</td></tr>
-  <tr><td>State Estimation</td><td>what TF, odometry and a Kalman filter compute, and why the pose drifts</td><td class="soon">in preparation</td></tr>
-  <tr><td>Control Systems</td><td>how feedback and PID turn a path into wheel commands, and why timing matters</td><td class="soon">in preparation</td></tr>
-  <tr><td>Decision-Making</td><td>state machines, behavior trees and planning, and how to handle failure in a match</td><td class="soon">in preparation</td></tr>
-  <tr><td>Machine Learning with Robotics</td><td>what a detection model does, and what it takes to run one on the robot</td><td class="soon">in preparation</td></tr>
-  <tr><td>Robot Software Landscape</td><td>how every part of the stack fits together, on our robot and in industry</td><td class="soon">in preparation</td></tr>
-  <tr><td>Debug Clinic</td><td>how to fix a broken ROS 2 workspace yourself (a hands-on workshop)</td><td class="soon">in preparation</td></tr>
+  <tr><th><span lang="en">Course</span><span lang="zh-Hant">課程</span></th><th><span lang="en">You leave knowing</span><span lang="zh-Hant">上完你會知道</span></th><th></th></tr>
+  <tr><td><span lang="en">OS‑1: Files and Processes</span><span lang="zh-Hant">OS‑1：檔案與 process</span></td><td><span lang="en">why a node is a Linux process, and what permissions, signals and libraries mean for it</span><span lang="zh-Hant">為什麼 node 就是一個 Linux process，以及權限、signal 和函式庫對它有什麼影響</span></td><td class="soon"><span lang="en">in preparation</span><span lang="zh-Hant">準備中</span></td></tr>
+  <tr><td><span lang="en">OS‑2: Memory, Concurrency and Devices</span><span lang="zh-Hant">OS‑2：記憶體、並行與裝置</span></td><td><span lang="en">how threads, executors and interrupts work, and why nodes deadlock</span><span lang="zh-Hant">執行緒、executor 和中斷怎麼運作，以及 node 為什麼會死結</span></td><td class="soon"><span lang="en">in preparation</span><span lang="zh-Hant">準備中</span></td></tr>
+  <tr><td><span lang="en">Networking &amp; Virtualization</span><span lang="zh-Hant">網路與虛擬化</span></td><td><span lang="en">how ROS 2 finds other nodes over the network, and why Docker and campus Wi‑Fi get in the way</span><span lang="zh-Hant">ROS 2 怎麼透過網路找到其他 node，以及為什麼 Docker 和校園 Wi‑Fi 會礙事</span></td><td class="soon"><span lang="en">in preparation</span><span lang="zh-Hant">準備中</span></td></tr>
+  <tr><td><span lang="en">State Estimation</span><span lang="zh-Hant">狀態估測</span></td><td><span lang="en">what TF, odometry and a Kalman filter compute, and why the pose drifts</span><span lang="zh-Hant">TF、odometry 和 Kalman filter 在算什麼，以及位置為什麼會飄</span></td><td class="soon"><span lang="en">in preparation</span><span lang="zh-Hant">準備中</span></td></tr>
+  <tr><td><span lang="en">Control Systems</span><span lang="zh-Hant">控制系統</span></td><td><span lang="en">how feedback and PID turn a path into wheel commands, and why timing matters</span><span lang="zh-Hant">回授和 PID 怎麼把路徑變成輪子的指令，以及時間為什麼重要</span></td><td class="soon"><span lang="en">in preparation</span><span lang="zh-Hant">準備中</span></td></tr>
+  <tr><td><span lang="en">Decision-Making</span><span lang="zh-Hant">決策</span></td><td><span lang="en">state machines, behavior trees and planning, and how to handle failure in a match</span><span lang="zh-Hant">狀態機、behavior tree 和規劃，以及比賽中出錯時怎麼處理</span></td><td class="soon"><span lang="en">in preparation</span><span lang="zh-Hant">準備中</span></td></tr>
+  <tr><td><span lang="en">Machine Learning with Robotics</span><span lang="zh-Hant">機器學習與機器人</span></td><td><span lang="en">what a detection model does, and what it takes to run one on the robot</span><span lang="zh-Hant">偵測模型在做什麼，以及要在機器人上跑一個需要什麼</span></td><td class="soon"><span lang="en">in preparation</span><span lang="zh-Hant">準備中</span></td></tr>
+  <tr><td><span lang="en">Robot Software Landscape</span><span lang="zh-Hant">機器人軟體全貌</span></td><td><span lang="en">how every part of the stack fits together, on our robot and in industry</span><span lang="zh-Hant">整個架構的每一塊怎麼拼在一起，在我們的機器人上和在業界</span></td><td class="soon"><span lang="en">in preparation</span><span lang="zh-Hant">準備中</span></td></tr>
+  <tr><td><span lang="en">Debug Clinic</span><span lang="zh-Hant">除錯工作坊</span></td><td><span lang="en">how to fix a broken ROS 2 workspace yourself (a hands-on workshop)</span><span lang="zh-Hant">怎麼自己修好一個壞掉的 ROS 2 workspace（實作工作坊）</span></td><td class="soon"><span lang="en">in preparation</span><span lang="zh-Hant">準備中</span></td></tr>
 </table>
 
-<h2 id="example"><small>Example</small>See what a worksheet looks like</h2>
-<p><a href="_template/index.html"><b>Waiting inside a callback</b></a>: a short example worksheet, and the template for every course. A node freezes when it waits for a service reply inside a callback; you find out why, and fix it two ways.</p>
+<h2 id="example"><small><span lang="en">Example</span><span lang="zh-Hant">範例</span></small><span lang="en">See what a worksheet looks like</span><span lang="zh-Hant">學習單長什麼樣子</span></h2>
+<p lang="en"><a href="_template/index.html"><b>Waiting inside a callback</b></a>: a short example worksheet, and the template for every course. A node freezes when it waits for a service reply inside a callback; you find out why, and fix it two ways.</p>
+<p lang="zh-Hant"><a href="_template/index.html"><b>在 callback 裡等待</b></a>：一份短的範例學習單，也是每堂課的範本。一個 node 在 callback 裡等 service 的回覆，結果整個卡住；你會搞懂原因，並用兩種方法修好。</p>
 
-<h2 id="before"><small>Before you start</small>The basics</h2>
-<p>The courses assume you have worked through the club's tutorials:</p>
+<h2 id="before"><small><span lang="en">Before you start</span><span lang="zh-Hant">開始之前</span></small><span lang="en">The basics</span><span lang="zh-Hant">基礎</span></h2>
+<p lang="en">The courses assume you have worked through the club's tutorials:</p>
+<p lang="zh-Hant">這些課假設你已經做過社團的教學：</p>
 <ul>
-  <li><a href="https://ditrobotics.notion.site/ROS2-228c8b048fcf80178d03c0f41c5a1a59">ROS 2 tutorial (Notion)</a></li>
-  <li><a href="https://ditrobotics.notion.site/Docker-2d6c8b048fcf8093b092f24de4ef1a95">Docker tutorial (Notion)</a></li>
+  <li><a href="https://ditrobotics.notion.site/ROS2-228c8b048fcf80178d03c0f41c5a1a59"><span lang="en">ROS 2 tutorial (Notion)</span><span lang="zh-Hant">ROS 2 教學（Notion）</span></a></li>
+  <li><a href="https://ditrobotics.notion.site/Docker-2d6c8b048fcf8093b092f24de4ef1a95"><span lang="en">Docker tutorial (Notion)</span><span lang="zh-Hant">Docker 教學（Notion）</span></a></li>
 </ul>
 
-<footer class="ws-foot">DIT Robotics · Software courses</footer>
+<footer class="ws-foot"><span lang="en">DIT Robotics · Software courses</span><span lang="zh-Hant">DIT Robotics · 軟體課程</span></footer>
 </div>
 <script src="assets/worksheet.js"></script>
 </body>

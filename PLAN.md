@@ -44,6 +44,8 @@ And every course keeps the balance above: at least one Part or box that goes bey
 
 ## 1. OS‑1: Files and Processes
 
+**Title:** Ctrl+C Is Not Enough: the Life and Death of a Process (Ctrl+C 不夠用：process 的生與死)
+
 **Through-line:** how robot software actually runs on a Linux computer, from `ros2 launch` to the
 moment you try to stop it.
 
@@ -85,6 +87,8 @@ most, and all of them are OS problems, not ROS problems.
 
 ## 2. OS‑2: Memory, Concurrency and Devices
 
+**Title:** Below the Node: a Deep Dive into Memory, Threads and Devices (node 之下：深入記憶體、執行緒與裝置)
+
 **Through-line:** what the computer is really doing while your node runs: where its data lives,
 who gets the CPU when, and how bytes arrive from a device.
 
@@ -124,6 +128,8 @@ bridge to firmware: interrupts and device I/O are where Linux meets the MCU.
 
 ## 3. Networking & Virtualization
 
+**Title:** Where Did My Message Go? Networks, DDS and Containers (我的 message 去哪了？網路、DDS 與容器)
+
 **Through-line:** the trip a message takes from one node to another (same machine, another
 container, another computer over Wi‑Fi), and what can stop it at each step.
 
@@ -157,6 +163,8 @@ messages and fragmentation; DNS and mDNS; ROS 2 security (SROS2).
 solved by guessing.
 
 ## 4. State Estimation
+
+**Title:** Stochastic Self‑Localization: Where Am I, Probably? (隨機的自我定位：我「大概」在哪？)
 
 **Through-line:** where is the robot? Every sensor gives a wrong answer, each in its own way;
 combining them gives a better one, and knowing *how* wrong is half the job.
@@ -192,6 +200,8 @@ Everything downstream (nav, main) trusts the pose estimate.
 
 ## 5. Control Systems
 
+**Title:** Closing the Loop: Feedback Against a World That Pushes Back (閉迴路：用回授對抗會反推的世界)
+
 **Through-line:** turning a wanted motion into motor commands, and keeping it right while the
 world pushes back.
 
@@ -223,6 +233,8 @@ into wheel commands, how a mechanism reaches a target, and how firmware holds mo
 also explains why timing matters.
 
 ## 6. Decision-Making and Planning
+
+**Title:** From Goal to Path: Search, Behavior Trees and Strategy (從目標到路徑：搜尋、行為樹與策略)
 
 **Through-line:** a match lasts 100 seconds: what should the robot do next, where should it go,
 and what should it do when that fails?
@@ -268,6 +280,8 @@ goes wrong mid-match.
 
 ## 7. Machine Learning with Robotics
 
+**Title:** Gradient Descent into Robotics (沿梯度墜入機器人)
+
 Basic terms and intuition; sources: CS231n and beyond.
 
 **Through-line:** from pixels to something the robot can act on: a detection it can trust, in
@@ -310,6 +324,8 @@ robot, and it's rarely taught.
 
 ## 8. Robot Software Landscape
 
+**Title:** Robot Software Landscape (機器人軟體全貌); label: A View from Above the Stack (俯瞰整座 stack)
+
 **Through-line:** one robot, end to end: follow one action from the sensor reading to the motor
 and back, then place every part (and industry's robots) on the same map.
 
@@ -342,6 +358,8 @@ last. The industry section goes stale fastest: refresh it each year.
 ---
 
 ## Debug Clinic (workshop, not a course)
+
+**Title:** Debug Clinic: the Scientific Method for Broken Robots (除錯診所：修壞掉機器人的科學方法)
 
 **Through-line:** a method, not a list of fixes: reproduce, read the error, narrow it down, check
 one assumption at a time.

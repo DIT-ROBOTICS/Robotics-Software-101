@@ -6,7 +6,7 @@
 <!-- OS-1. Every example was run in ROS 2 Humble (dit-course's base) on 2026-11-20/21; outputs are pasted
      from those runs (ROS timestamps and tracebacks cut where marked). No times on this page:
      see SESSION.md. -->
-<title>OS‑1: Files and Processes</title>
+<title>OS‑1: Ctrl+C Is Not Enough</title>
 <script src="../assets/lang.js"></script>
 <link rel="stylesheet" href="../assets/worksheet.css">
 </head>
@@ -15,8 +15,8 @@
 
 <div class="masthead">
   <div>
-    <div class="kicker"><span lang="en">DIT Robotics · Software courses · OS‑1</span><span lang="zh-Hant">DIT Robotics · 軟體課程 · OS‑1</span></div>
-    <h1><span lang="en">Files and Processes</span><span lang="zh-Hant">檔案與 process</span></h1>
+    <div class="kicker"><span lang="en">DIT Robotics · Software courses · OS‑1: Files and Processes</span><span lang="zh-Hant">DIT Robotics · 軟體課程 · OS‑1：檔案與 process</span></div>
+    <h1><span lang="en">Ctrl+C Is Not Enough: the Life and Death of a Process</span><span lang="zh-Hant">Ctrl+C 不夠用：process 的生與死</span></h1>
     <p class="lead" lang="en">Every node you start is a Linux <span class="who a">process</span>, and the <span class="who os">Linux kernel</span> decides how it starts, how it stops and what it may touch. In this session we start a small robot stack, try to stop it, and fail. Then we find out why. On the way you learn the operating-system ideas behind most "it won't stop", "it died when SSH dropped", "permission denied" and "works on my machine" problems: processes, signals, daemons, file permissions and shared libraries.</p>
     <p class="lead" lang="zh-Hant">你啟動的每個 node 都是一個 Linux <span class="who a">process</span>，而 <span class="who os">Linux 核心</span>決定它怎麼啟動、怎麼停止、可以碰什麼。這堂課我們啟動一個小小的機器人系統，試著把它停掉，結果失敗了；然後找出原因。過程中你會學到大部分「停不下來」、「SSH 一斷就死掉」、「permission denied」、「在我電腦上可以跑」問題背後的作業系統觀念：process、signal、daemon、檔案權限和共享函式庫。</p>
     <p class="howto" lang="en"><b>How to use this page.</b> The numbered Parts are what we do together in the session. Boxes and Parts marked <b>Go deeper</b> hold ideas that take longer to sink in: come back to them after the session. Every command here runs in the course container: see <b>Before the session</b> below. The <b>中文</b> button (or the L key) switches the page to Chinese.</p>

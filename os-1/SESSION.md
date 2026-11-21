@@ -1,4 +1,4 @@
-# Session plan: OS‑1, Files and Processes
+# Session plan: OS‑1, Files and Processes ("Ctrl+C Is Not Enough")
 
 For the presenter. Members never see this file: the worksheet shows no times. (The repo is public,
 so anyone can still read it on GitHub. Keep it to timing and teaching notes.)

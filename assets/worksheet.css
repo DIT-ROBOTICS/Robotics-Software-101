@@ -243,7 +243,8 @@ html.zh .ws pre .hl::after { content: attr(data-note-zh); }
 html.zh .kicker, html.zh .ws h2 small, html.zh .case-h, html.zh .try-h, html.zh .map .mt, html.zh table.t th { letter-spacing: .06em; }
 
 /* ---------- course home: one card per course ---------- */
-.cgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(19rem, 1fr)); gap: 1rem; margin: 1rem 0 1.5rem; }
+.cgrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1.25rem; margin: 1rem 0 1.5rem; }
+@media (max-width: 52rem) { .cgrid { grid-template-columns: 1fr; } }
 .ccard { background: #fff; border: 1px solid var(--line); border-top: 3px solid var(--ink); border-radius: var(--r);
          padding: .9rem 1.1rem 1rem; display: flex; flex-direction: column; gap: .45rem; }
 .ccard.ready { border-top-color: var(--sig); }

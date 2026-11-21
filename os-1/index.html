@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<!-- OS-1. Every example was run in dit-ros2-tutorial:humble on 2026-11-20; outputs are pasted
+<!-- OS-1. Every example was run in ROS 2 Humble (dit-course's base) on 2026-11-20/21; outputs are pasted
      from those runs (ROS timestamps and tracebacks cut where marked). No times on this page:
      see SESSION.md. -->
 <title>OS‑1: Files and Processes</title>
@@ -19,12 +19,24 @@
     <h1><span lang="en">Files and Processes</span><span lang="zh-Hant">檔案與 process</span></h1>
     <p class="lead" lang="en">Every node you start is a Linux <span class="who a">process</span>, and the <span class="who os">Linux kernel</span> decides how it starts, how it stops and what it may touch. In this session we start a small robot stack, try to stop it, and fail. Then we find out why. On the way you learn the operating-system ideas behind most "it won't stop", "it died when SSH dropped", "permission denied" and "works on my machine" problems: processes, signals, daemons, file permissions and shared libraries.</p>
     <p class="lead" lang="zh-Hant">你啟動的每個 node 都是一個 Linux <span class="who a">process</span>，而 <span class="who os">Linux 核心</span>決定它怎麼啟動、怎麼停止、可以碰什麼。這堂課我們啟動一個小小的機器人系統，試著把它停掉，結果失敗了；然後找出原因。過程中你會學到大部分「停不下來」、「SSH 一斷就死掉」、「permission denied」、「在我電腦上可以跑」問題背後的作業系統觀念：process、signal、daemon、檔案權限和共享函式庫。</p>
-    <p class="howto" lang="en"><b>How to use this page.</b> The numbered Parts are what we do together in the session. Boxes and Parts marked <b>Go deeper</b> hold ideas that take longer to sink in: come back to them after the session. Every command here runs in the club's Humble container. The <b>中文</b> button (or the L key) switches the page to Chinese.</p>
-    <p class="howto" lang="zh-Hant"><b>怎麼用這一頁。</b>有編號的部分是課堂上一起做的。標成<b>延伸</b>的方塊和部分，放的是比較需要時間消化的觀念，課後再回來看。這裡每個指令都在社團的 Humble 容器裡跑。<b>English</b> 按鈕（或 L 鍵）可以切回英文。</p>
+    <p class="howto" lang="en"><b>How to use this page.</b> The numbered Parts are what we do together in the session. Boxes and Parts marked <b>Go deeper</b> hold ideas that take longer to sink in: come back to them after the session. Every command here runs in the course container: see <b>Before the session</b> below. The <b>中文</b> button (or the L key) switches the page to Chinese.</p>
+    <p class="howto" lang="zh-Hant"><b>怎麼用這一頁。</b>有編號的部分是課堂上一起做的。標成<b>延伸</b>的方塊和部分，放的是比較需要時間消化的觀念，課後再回來看。這裡每個指令都在課程容器裡跑：見下面的<b>上課前</b>。<b>English</b> 按鈕（或 L 鍵）可以切回英文。</p>
   </div>
 </div>
 
 <nav class="map" aria-label="Session map" data-home="../index.html"></nav>
+
+<div class="try" id="setup">
+  <div class="try-h"><span lang="en">Before the session</span><span lang="zh-Hant">上課前</span></div>
+  <div class="try-t"><span lang="en">Open the course container</span><span lang="zh-Hant">開啟課程容器</span></div>
+  <p lang="en">If you haven't yet, do the one-time setup on the <a href="../index.html#before">course home page</a>: clone the repository and build <code>dit-course</code>. Then <code>git pull</code>, and from the top of the repository start terminal T1:</p>
+  <p lang="zh-Hant">如果還沒做過，先照<a href="../index.html#before">課程首頁</a>做一次設定：clone repository，建置 <code>dit-course</code>。然後 <code>git pull</code>，在 repository 的最上層開終端機 T1：</p>
+<pre data-lang="sh">docker run -it --rm --name os1 -v "$PWD/os-1/code":/code dit-course bash
+# more terminals (T2, T3, ...), each in a new window:
+docker exec -it os1 bash</pre>
+  <p lang="en"><code>-v</code> puts this course's <code>code/</code> folder inside the container at <code>/code</code>, so a file you edit on your laptop changes inside the container too.</p>
+  <p lang="zh-Hant"><code>-v</code> 會把這堂課的 <code>code/</code> 資料夾放進容器的 <code>/code</code>，所以你在筆電上改檔案，容器裡也跟著改。</p>
+</div>
 
 <!-- ============================================================ -->
 <h2 id="puzzle"><small><span lang="en">Part 1</span><span lang="zh-Hant">第 1 部分</span></small><span lang="en">You stopped it. It's still running.</span><span lang="zh-Hant">你停掉它了，它還在跑</span></h2>
@@ -281,9 +293,9 @@ L3 cache:                                8 MiB (2 instances)</pre>
 <div class="try">
   <div class="try-h"><span lang="en">Try it</span><span lang="zh-Hant">動手試</span></div>
   <div class="try-t"><span lang="en">Measure your own computer</span><span lang="zh-Hant">量你自己的電腦</span></div>
-  <p lang="en">Start the club's Humble container from this worksheet's folder (every Try-it box uses it; see <code>ros2-basics/verify/README.md</code> to build the image once), or use any Linux laptop with <code>g++</code>. Before you run it, guess your RAM number.</p>
-  <p lang="zh-Hant">在這份學習單的資料夾裡啟動社團的 Humble 容器（每個「動手試」都用它；image 照 <code>ros2-basics/verify/README.md</code> 建一次就好），或用任何有 <code>g++</code> 的 Linux 筆電。執行之前，先猜你的 RAM 數字。</p>
-<pre data-lang="sh">docker run -it --rm --name os1 -v "$PWD/code":/code dit-ros2-tutorial:humble bash
+  <p lang="en">Start T1 as in <a href="#setup">Before the session</a>, or use any Linux laptop with <code>g++</code>. Before you run it, guess your RAM number.</p>
+  <p lang="zh-Hant">照<a href="#setup">上課前</a>的步驟開 T1，或用任何有 <code>g++</code> 的 Linux 筆電。執行之前，先猜你的 RAM 數字。</p>
+<pre data-lang="sh">docker run -it --rm --name os1 -v "$PWD/os-1/code":/code dit-course bash
 cd /code
 g++ -O2 -o /tmp/memory_latency memory_latency.cpp &amp;&amp; /tmp/memory_latency
 python3 ssd_latency.py      # writes a 1 GiB file in /code, then deletes it
@@ -452,14 +464,8 @@ Threads:	11</pre>
 <p lang="en">Every one of them ends the process by default. But a process can <b>catch</b> a signal: tell the kernel "when this one arrives, run my function instead". A node catches SIGINT to shut down cleanly. A launcher should catch it to stop its children first. Only SIGKILL can't be caught: the process never gets to run any code. <mark>Whether a signal is caught decides whether the process gets to clean up.</mark></p>
 <p lang="zh-Hant">它們的預設動作都是結束 process。但 process 可以<b>接住</b>（catch）signal：告訴核心「這個 signal 到的時候，改跑我的函式」。node 接住 SIGINT 是為了好好地結束；launcher 應該接住它，先把子 process 停掉。只有 SIGKILL 接不住：process 連一行程式都沒機會跑。<mark>signal 有沒有被接住，決定了 process 有沒有機會收拾善後。</mark></p>
 
-<p lang="en">The kernel keeps, for every process, the list of signals it catches, and <code>/proc</code> shows it as a bit mask (<code>SigCgt</code>, in hexadecimal: bit <i>n</i>−1 stands for signal <i>n</i>). Compare the launcher with the driver:</p>
-<p lang="zh-Hant">核心幫每個 process 記著它接住哪些 signal，<code>/proc</code> 會用位元遮罩顯示（<code>SigCgt</code>，十六進位：第 <i>n</i>−1 個位元代表 signal <i>n</i>）。比較 launcher 和 driver：</p>
-<pre class="term"><span class="ok">$ grep SigCgt /proc/&lt;launcher&gt;/status</span>
-SigCgt:	0000000100000002      <span class="m">0x2: signal 2 → SIGINT only</span>
-<span class="ok">$ grep SigCgt /proc/&lt;driver&gt;/status</span>
-SigCgt:	0000000100004002      <span class="m">0x4002: signals 2 and 15 → SIGINT and SIGTERM</span></pre>
-<p lang="en">(The leading 1 is signal 33, used inside the C library; ignore it.) In ROS 2 Humble, <code>ros2 launch</code> catches SIGINT and nothing else. Now step through what <code>kill</code> did, and compare it with Ctrl+C:</p>
-<p lang="zh-Hant">（開頭的 1 是 signal 33，C 函式庫內部用的，不用管。）在 ROS 2 Humble，<code>ros2 launch</code> 只接 SIGINT，其他都不接。現在一步一步看 <code>kill</code> 做了什麼，再跟 Ctrl+C 比較：</p>
+<p lang="en">In ROS 2 Humble, <code>ros2 launch</code> catches SIGINT and nothing else. Now step through what <code>kill</code> did, and compare it with Ctrl+C:</p>
+<p lang="zh-Hant">在 ROS 2 Humble，<code>ros2 launch</code> 只接 SIGINT，其他都不接。現在一步一步看 <code>kill</code> 做了什麼，再跟 Ctrl+C 比較：</p>
 
 <div class="callout walk">
   <div class="glyph">W1</div>
@@ -476,50 +482,81 @@ SigCgt:	0000000100004002      <span class="m">0x4002: signals 2 and 15 → SIGIN
 <p lang="zh-Hant">Ctrl+C 有用，是因為 <b>process group</b>。shell 會把一個指令以及它啟動的所有東西放進同一個 group，並設成終端機的<b>前景 group</b>。Ctrl+C 會同時把 SIGINT 送給這個 group 裡的每個 process，所以每個 node 都親自收到 signal，而且每個都接住了。</p>
 
 <h3><span lang="en">When a process doesn't stop</span><span lang="zh-Hant">process 不肯停的時候</span></h3>
-<p lang="en">A good launcher doesn't wait forever. Here is a node, <code>stubborn.py</code>, that ignores SIGINT, and what <code>ros2 launch</code> does after Ctrl+C (seconds since Ctrl+C on the left):</p>
-<p lang="zh-Hant">好的 launcher 不會永遠等下去。這是一個忽略 SIGINT 的 node：<code>stubborn.py</code>，以及按下 Ctrl+C 之後 <code>ros2 launch</code> 做了什麼（左邊是按下 Ctrl+C 後的秒數）：</p>
+<p lang="en">Ctrl+C only works if each node lets the signal end it, and that is easy to break by accident. Here is the driver written another common way, <code>loop_driver.py</code>: a plain loop instead of a timer and <code>spin()</code>, with a bare <code>except:</code> to skip a garbled line:</p>
+<p lang="zh-Hant">Ctrl+C 有用的前提是每個 node 都讓 signal 結束它，而這很容易不小心弄壞。這是用另一種常見寫法寫的 driver：<code>loop_driver.py</code>。它用一般的迴圈，而不是 timer 加 <code>spin()</code>，再用一個沒寫型別的 <code>except:</code> 跳過亂掉的資料：</p>
+<pre data-lang="py">while True:
+    try:
+        word, n = dev.readline().decode().split()   # e.g. "ticks 42"
+        pub.publish(Int64(data=int(n)))
+<span class="hl" data-note="Meant for a garbled line. But in Python, Ctrl+C arrives as an exception too (KeyboardInterrupt), and a bare except: catches every exception." data-note-zh="本來是要處理亂掉的資料。但在 Python 裡，Ctrl+C 也是以例外（KeyboardInterrupt）的形式出現，而沒寫型別的 except: 會接住所有例外。">    except:                                          # skip a garbled line
+        pass</span></pre>
+<p lang="en">It works fine until you stop it. In Python, Ctrl+C arrives as an exception, <code>KeyboardInterrupt</code>, and the bare <code>except:</code> catches that too, so the loop just goes on. This is what <code>ros2 launch loop_driver.launch.py</code> does after Ctrl+C (seconds since Ctrl+C on the left):</p>
+<p lang="zh-Hant">在你要停掉它之前，一切正常。在 Python 裡，Ctrl+C 會以例外 <code>KeyboardInterrupt</code> 的形式出現，而沒寫型別的 <code>except:</code> 連它也接住了，所以迴圈照樣繼續。這是按下 Ctrl+C 之後，<code>ros2 launch loop_driver.launch.py</code> 做了什麼（左邊是按下 Ctrl+C 後的秒數）：</p>
 <pre class="term"><span class="m"> 0.0</span>  ^C[WARNING] [launch]: user interrupted with ctrl-c (SIGINT)
-<span class="m"> 5.0</span>  <span class="b">[ERROR] [python3-1]: process[python3-1] failed to terminate '5' seconds after receiving 'SIGINT', escalating to 'SIGTERM'</span>
-<span class="m"> 5.0</span>  [INFO] [python3-1]: sending signal 'SIGTERM' to process[python3-1]
-<span class="m">10.0</span>  <span class="b">[ERROR] [python3-1]: process[python3-1] failed to terminate '10.0' seconds after receiving 'SIGTERM', escalating to 'SIGKILL'</span>
-<span class="m">10.0</span>  [INFO] [python3-1]: sending signal 'SIGKILL' to process[python3-1]
-<span class="m">10.0</span>  [ERROR] [python3-1]: process has died [pid 445, exit code -9, cmd 'python3 /code/stubborn.py'].</pre>
+<span class="m"> 0.0</span>  [ERROR] [python3-1]: process has died [pid 25, exit code -2, cmd 'python3 /code/fake_mcu.py'].
+<span class="m"> 5.0</span>  <span class="b">[ERROR] [python3-2]: process[python3-2] failed to terminate '5' seconds after receiving 'SIGINT', escalating to 'SIGTERM'</span>
+<span class="m"> 5.0</span>  [INFO] [python3-2]: sending signal 'SIGTERM' to process[python3-2]
+<span class="m">10.0</span>  <span class="b">[ERROR] [python3-2]: process[python3-2] failed to terminate '10.0' seconds after receiving 'SIGTERM', escalating to 'SIGKILL'</span>
+<span class="m">10.0</span>  [INFO] [python3-2]: sending signal 'SIGKILL' to process[python3-2]
+<span class="m">10.0</span>  [ERROR] [python3-2]: process has died [pid 27, exit code -9, cmd 'python3 /code/loop_driver.py'].</pre>
 <p lang="en">Ask politely, then firmly, then end it: SIGINT, SIGTERM after 5 s, SIGKILL after 5 s more. <mark>SIGKILL is the last resort, not the first.</mark> A process killed with SIGKILL can't close files, release a device or tell anyone it left, and Part 5 shows what that leaves behind. The exit code tells you how it ended: −9 means "ended by signal 9".</p>
 <p lang="zh-Hant">先客氣地問，再強硬地要求，最後直接結束：SIGINT，5 秒後 SIGTERM，再 5 秒後 SIGKILL。<mark>SIGKILL 是最後手段，不是第一個選擇。</mark>被 SIGKILL 結束的 process 沒辦法關檔案、釋放裝置，也沒辦法通知別人它離開了；第 5 部分會看到這會留下什麼。exit code 告訴你它怎麼結束的：−9 代表「被 signal 9 結束」。</p>
+
+<p lang="en">The fix is one word: catch only what you expect, <code>except ValueError:</code> (what a garbled line raises). With that change, the same Ctrl+C stops the driver at once, with exit code −2. Better still, use a timer and <code>spin()</code>, as <code>driver.py</code> does.</p>
+<p lang="zh-Hant">修正只要加一個字：只接你預期會發生的例外，<code>except ValueError:</code>（亂掉的資料會丟出的例外）。改了之後，同樣的 Ctrl+C 會讓 driver 立刻結束，exit code 是 −2。更好的做法是像 <code>driver.py</code> 那樣用 timer 加 <code>spin()</code>。</p>
 
 <div class="quiz">
   <button><span lang="en"><b>In Part 1, would <code>kill -9 471</code> have been better?</b></span><span lang="zh-Hant"><b>第 1 部分如果用 <code>kill -9 471</code>，會比較好嗎？</b></span><span class="ans"><span lang="en">No, the same: SIGKILL also goes to the launcher alone, which can't even try to clean up. We tried it: the three nodes kept running with PPID 1.</span><span lang="zh-Hant">不會，結果一樣：SIGKILL 一樣只送給 launcher，它連收拾的機會都沒有。我們試過了：三個 node 繼續跑，PPID 是 1。</span></span></button>
   <button><span lang="en"><b>The nodes are already orphans.</b> How do you stop them?</span><span lang="zh-Hant"><b>node 已經變成孤兒了。</b>要怎麼停掉它們？</span><span class="ans"><span lang="en">Send the signal to them directly: <code>kill 472 474 476</code>, or by name, <code>pkill -f /code/</code>. Check with <code>ps</code> afterwards. Careful: <code>pkill -f</code> matches anywhere in the command line, including your own shell's.</span><span lang="zh-Hant">直接送 signal 給它們：<code>kill 472 474 476</code>，或依名稱 <code>pkill -f /code/</code>。之後用 <code>ps</code> 確認。小心：<code>pkill -f</code> 會比對整個指令列的任何地方，連你自己的 shell 都可能被比對到。</span></span></button>
-  <button><span lang="en"><b>From T2, you send <code>kill -INT</code> to the launcher.</b> It's SIGINT, the signal it catches. What happens?</span><span lang="zh-Hant"><b>你在 T2 對 launcher 送 <code>kill -INT</code>。</b>那是 SIGINT，它會接住的 signal。會發生什麼事？</span><span class="ans"><span lang="en">The launcher catches it, but assumes the SIGINT came from Ctrl+C and so already reached its children. It waits 5 s for them to stop, then escalates to SIGTERM. Everything does stop, 5 s late. We saw exactly this.</span><span lang="zh-Hant">launcher 接住了，但它以為 SIGINT 來自 Ctrl+C，所以子 process 應該也收到了。它等 5 秒讓它們停，然後升級成 SIGTERM。最後全部都停了，只是晚了 5 秒。我們實際看到的就是這樣。</span></span></button>
+  <button><span lang="en"><b>From T2, you send <code>kill -INT</code> to the launcher.</b> It's SIGINT, the signal it catches. What happens?</span><span lang="zh-Hant"><b>你在 T2 對 launcher 送 <code>kill -INT</code>。</b>那是 SIGINT，它會接住的 signal。會發生什麼事？</span><span class="ans"><span lang="en">The launcher catches it, but assumes the SIGINT came from Ctrl+C and so already reached its children. It waits 5 s for them to stop, then escalates to SIGTERM. Everything does stop, 5 s late.</span><span lang="zh-Hant">launcher 接住了，但它以為 SIGINT 來自 Ctrl+C，所以子 process 應該也收到了。它等 5 秒讓它們停，然後升級成 SIGTERM。最後全部都停了，只是晚了 5 秒。</span></span></button>
 </div>
 
 <div class="case robot">
   <div class="case-h"><span lang="en">On a robot</span><span lang="zh-Hant">在機器人上</span></div>
   <div class="case-t"><span lang="en">Why does <code>docker stop</code> take 10 seconds?</span><span lang="zh-Hant">為什麼 <code>docker stop</code> 要 10 秒？</span></div>
-  <p lang="en">On a robot, the stack often runs as the main command of a container, so the launcher is the container's PID 1. <code>docker stop</code> sends SIGTERM, waits 10 s, then sends SIGKILL. PID 1 is special: <mark>the kernel never applies a default action to PID 1</mark>, so a signal it doesn't catch is simply dropped. Our launcher doesn't catch SIGTERM, so nothing happens for 10 s, and then everything is SIGKILLed with no chance to clean up:</p>
-  <p lang="zh-Hant">在機器人上，整個系統常常是容器的主要指令，所以 launcher 就是容器的 PID 1。<code>docker stop</code> 會送 SIGTERM，等 10 秒，再送 SIGKILL。PID 1 很特別：<mark>核心從不對 PID 1 執行預設動作</mark>，所以它沒接的 signal 會直接被丟掉。我們的 launcher 不接 SIGTERM，所以 10 秒內什麼都沒發生，然後全部被 SIGKILL，完全沒機會收拾：</p>
-<pre class="term"><span class="ok">$ time docker stop os1b</span>
-real	0m10.219s
-<span class="ok">$ time docker stop -s SIGINT os1b</span>      <span class="m"># the signal the launcher catches</span>
-real	0m0.248s</pre>
-  <p lang="en">With SIGINT, the launcher stopped every node cleanly in a quarter of a second. You can make that the default with <code>STOPSIGNAL SIGINT</code> in a Dockerfile or <code>stop_signal: SIGINT</code> in a compose file. A short <code>stop_grace_period</code> only makes the SIGKILL come sooner; it doesn't make the stop clean.</p>
-  <p lang="zh-Hant">改用 SIGINT 後，launcher 在 0.25 秒內把每個 node 都好好停掉了。你可以把它設成預設：Dockerfile 裡寫 <code>STOPSIGNAL SIGINT</code>，或 compose 檔裡寫 <code>stop_signal: SIGINT</code>。把 <code>stop_grace_period</code> 設短只會讓 SIGKILL 早點來，並不會讓停止變乾淨。</p>
+  <p lang="en">On a robot, nobody types <code>ros2 launch</code> by hand. The launch is written into the container's setup, often a compose file, as the container's <b>command</b>: the program Docker runs when the container starts. Ours, <code>code/compose.yaml</code>:</p>
+  <p lang="zh-Hant">在機器人上，沒有人會手打 <code>ros2 launch</code>。launch 會寫在容器的設定裡（通常是 compose 檔），當成容器的 <b>command</b>：容器啟動時 Docker 要跑的程式。我們的 <code>code/compose.yaml</code>：</p>
+<pre>services:
+  robot:
+    image: dit-course
+    volumes:
+      - ./:/code
+    command: ros2 launch /code/robot.launch.py</pre>
+  <p lang="en">A container starts with no processes at all, so the command becomes its very first process, <b>PID 1</b>. There is no shell above it this time:</p>
+  <p lang="zh-Hant">容器一開始一個 process 都沒有，所以這個 command 就成了它的第一個 process：<b>PID 1</b>。這次它上面沒有 shell：</p>
+<pre class="term"><span class="ok">$ docker compose up -d</span>
+<span class="ok">$ docker compose exec robot ps -e -o pid,ppid,cmd</span>
+    PID    PPID CMD
+      1       0 /usr/bin/python3 /opt/ros/humble/bin/ros2 launch /code/robot.launch.py
+     14       1 python3 /code/fake_mcu.py
+     16       1 python3 /code/driver.py
+     18       1 python3 /code/monitor.py</pre>
+  <p lang="en"><code>docker stop</code> (or <code>docker compose stop</code>) sends SIGTERM to PID 1, waits 10 s, then sends SIGKILL to everything. The launcher doesn't catch SIGTERM. In Part 1 that ended it at once; but PID 1 is special: <mark>a signal that PID 1 doesn't catch is simply ignored.</mark> So nothing happens for 10 s, and then every node is SIGKILLed without any chance to clean up:</p>
+  <p lang="zh-Hant"><code>docker stop</code>（或 <code>docker compose stop</code>）會送 SIGTERM 給 PID 1，等 10 秒，再對所有東西送 SIGKILL。launcher 不接 SIGTERM。在第 1 部分，這讓它立刻結束；但 PID 1 很特別：<mark>PID 1 沒接的 signal 會直接被忽略。</mark>所以 10 秒內什麼事都沒發生，接著每個 node 都被 SIGKILL，完全沒機會收拾：</p>
+<pre class="term"><span class="ok">$ time docker compose stop</span>
+real	0m10.258s</pre>
+  <p lang="en">The fix is one line in the compose file, <code>stop_signal: SIGINT</code>: Docker then sends the signal the launcher does catch, as if you pressed Ctrl+C. The launcher stops every node cleanly, each with exit code −2:</p>
+  <p lang="zh-Hant">修正只要在 compose 檔加一行 <code>stop_signal: SIGINT</code>：Docker 就會改送 launcher 會接的 signal，就像你按了 Ctrl+C。launcher 會好好地停掉每個 node，每個的 exit code 都是 −2：</p>
+<pre class="term"><span class="ok">$ time docker compose stop</span>      <span class="m"># with stop_signal: SIGINT</span>
+real	0m0.310s</pre>
+  <p lang="en">(In a Dockerfile, the same setting is <code>STOPSIGNAL SIGINT</code>.)</p>
+  <p lang="zh-Hant">（在 Dockerfile 裡，同樣的設定是 <code>STOPSIGNAL SIGINT</code>。）</p>
 </div>
 
 <div class="try">
   <div class="try-h"><span lang="en">Try it</span><span lang="zh-Hant">動手試</span></div>
   <div class="try-t"><span lang="en">Make orphans, then stop a launch properly</span><span lang="zh-Hant">製造孤兒，再好好地停掉 launch</span></div>
-  <p lang="en">You need the club's Humble image once (see <code>ros2-basics/verify/README.md</code> to build <code>dit-ros2-tutorial:humble</code>). From this worksheet's folder, start T1:</p>
-  <p lang="zh-Hant">需要先建好社團的 Humble image（照 <code>ros2-basics/verify/README.md</code> 建立 <code>dit-ros2-tutorial:humble</code>，只要做一次）。在這份學習單的資料夾裡開 T1：</p>
-<pre data-lang="sh">docker run -it --rm --name os1 -v "$PWD/code":/code dit-ros2-tutorial:humble bash
+  <p lang="en">Start T1 as in <a href="#setup">Before the session</a>, and run the launch in it:</p>
+  <p lang="zh-Hant">照<a href="#setup">上課前</a>的步驟開 T1，在裡面跑 launch：</p>
+<pre data-lang="sh">docker run -it --rm --name os1 -v "$PWD/os-1/code":/code dit-course bash
 cd /code &amp;&amp; ros2 launch robot.launch.py</pre>
   <p lang="en">Open T2 with <code>docker exec -it os1 bash</code>. Before each step, say what you expect.</p>
   <p lang="zh-Hant">用 <code>docker exec -it os1 bash</code> 開 T2。每一步之前，先說出你預期會怎樣。</p>
   <ol>
-    <li><span lang="en">In T2: <code>ps -e -o pid,ppid,cmd --forest</code>. Find the launcher's PID, then <code>grep SigCgt /proc/PID/status</code>.</span><span lang="zh-Hant">在 T2：<code>ps -e -o pid,ppid,cmd --forest</code>。找到 launcher 的 PID，再 <code>grep SigCgt /proc/PID/status</code>。</span></li>
+    <li><span lang="en">In T2: <code>ps -e -o pid,ppid,cmd --forest</code>. Find the launcher's PID.</span><span lang="zh-Hant">在 T2：<code>ps -e -o pid,ppid,cmd --forest</code>。找到 launcher 的 PID。</span></li>
     <li><span lang="en"><code>kill</code> the launcher. Run <code>ros2 node list</code> and <code>ps</code> again. Who is the parent now?</span><span lang="zh-Hant"><code>kill</code> launcher。再跑一次 <code>ros2 node list</code> 和 <code>ps</code>。現在誰是父 process？</span></li>
     <li><span lang="en">Stop the orphans by PID. Start the launch again in T1 and stop it with Ctrl+C. Read the exit codes in the log.</span><span lang="zh-Hant">用 PID 停掉孤兒。在 T1 重新啟動 launch，用 Ctrl+C 停掉。讀 log 裡的 exit code。</span></li>
-    <li><span lang="en">Run <code>ros2 launch stubborn.launch.py</code> and press Ctrl+C. Count the seconds until the prompt comes back.</span><span lang="zh-Hant">跑 <code>ros2 launch stubborn.launch.py</code>，按 Ctrl+C。數一數過幾秒才回到提示字元。</span></li>
+    <li><span lang="en">Run <code>ros2 launch loop_driver.launch.py</code> and press Ctrl+C. Count the seconds until the prompt comes back. Then change <code>except:</code> to <code>except ValueError:</code> and try again.</span><span lang="zh-Hant">跑 <code>ros2 launch loop_driver.launch.py</code>，按 Ctrl+C。數一數過幾秒才回到提示字元。接著把 <code>except:</code> 改成 <code>except ValueError:</code>，再試一次。</span></li>
   </ol>
 </div>
 
@@ -534,14 +571,92 @@ cd /code &amp;&amp; ros2 launch robot.launch.py</pre>
 <p lang="en">No orphans this time: every process got the signal, and the default action for SIGHUP is to end. That is clean, but it is rarely what you want. <mark>A test run, a long recording or a match strategy you started over SSH dies with your Wi‑Fi.</mark> To survive, a process must not belong to your terminal at all.</p>
 <p lang="zh-Hant">這次沒有孤兒：每個 process 都收到了 signal，而 SIGHUP 的預設動作就是結束。乾淨是乾淨，但很少是你要的。<mark>透過 SSH 啟動的測試、長時間的錄製，或比賽策略，都會跟著你的 Wi‑Fi 一起死掉。</mark>要活下來，process 就不能屬於你的終端機。</p>
 
-<h3><span lang="en">A daemon has no terminal</span><span lang="zh-Hant">daemon 沒有終端機</span></h3>
-<p lang="en">A <b>daemon</b> is a process that runs in the background, with no terminal, until something stops it. You can spot one in <code>ps</code> by asking for the <code>tty</code> column, the terminal each process belongs to: a daemon's is <code>?</code>, and its parent is usually 1. Here is one from the same container:</p>
-<p lang="zh-Hant"><b>daemon</b> 是在背景跑、沒有終端機、直到有東西停掉它才結束的 process。在 <code>ps</code> 裡加上 <code>tty</code> 欄（每個 process 所屬的終端機）就很好認：daemon 的是 <code>?</code>，父 process 通常是 1。這是同一個容器裡的一個：</p>
+<h3><span lang="en">Going to the background</span><span lang="zh-Hant">跑到背景去</span></h3>
+<p lang="en">A <b>daemon</b> is a program that runs in the background, with no terminal, until something stops it.</p>
+<p lang="zh-Hant"><b>daemon</b> 是在背景跑、沒有終端機、直到有東西停掉它才結束的程式。</p>
+<p lang="en">A <b>terminal</b>, or <b>tty</b> (from "teletype", the typewriter-like machines early Unix ran on), is the device a program reads your keys from and prints its text to. Each terminal window or SSH login gets its own, named <code>/dev/pts/0</code>, <code>/dev/pts/1</code>, …, and <code>ps</code> shows it in the <code>tty</code> column. When you press Ctrl+C, the terminal itself turns the key into SIGINT and sends it out.</p>
+<p lang="zh-Hant"><b>終端機</b>，又叫 <b>tty</b>（來自 teletype：早期 Unix 用的那種像打字機的機器），是程式讀取你的按鍵、印出文字的裝置。每個終端機視窗或 SSH 登入都有自己的一個，名字是 <code>/dev/pts/0</code>、<code>/dev/pts/1</code>…，<code>ps</code> 把它顯示在 <code>tty</code> 欄。你按 Ctrl+C 時，是終端機自己把這個按鍵變成 SIGINT 送出去。</p>
+<p lang="en">A program turns itself into a daemon in two steps. <code>heartbeat.c</code> is a tiny daemon: after the two steps, it writes one line a second to a log file, forever.</p>
+<p lang="zh-Hant">程式只要兩步就能把自己變成 daemon。<code>heartbeat.c</code> 是一個很小的 daemon：做完這兩步後，它每秒寫一行到 log 檔，永遠不停。</p>
+<pre data-lang="cpp">int main(void) {
+    // 1. Fork, and the parent exits: your prompt comes back at once,
+    //    and the child carries on in the background.
+    if (fork() != 0) return 0;
+
+    // 2. Cut the child's tie to the terminal: Ctrl+C and a hang-up can't reach it any more.
+    setsid();
+
+    // The daemon's work: one line a second.
+    FILE *log = fopen("/tmp/heartbeat.log", "a");
+    for (int i = 1; ; i++) {
+        fprintf(log, "beat %d\n", i);
+        fflush(log);
+        sleep(1);
+    }
+}</pre>
+<p class="notes-hint" lang="en">The whole file is <a href="code/heartbeat.c"><code>code/heartbeat.c</code></a>.</p>
+<p class="notes-hint" lang="zh-Hant">完整檔案在 <a href="code/heartbeat.c"><code>code/heartbeat.c</code></a>。</p>
+<pre class="term"><span class="ok">$ gcc -o heartbeat /code/heartbeat.c &amp;&amp; ./heartbeat</span>
+<span class="ok">$</span>                                     <span class="m"># the prompt is back at once</span>
+<span class="ok">$ ps -e -o pid,ppid,tty,cmd | grep [h]eartbeat</span>
+     32       1 ?        ./heartbeat
+<span class="ok">$ exit</span>                                <span class="m"># close the terminal</span>
+<span class="m"># a few seconds later, in a new terminal</span>
+<span class="ok">$ ps -e -o pid,ppid,tty,cmd | grep [h]eartbeat</span>
+     32       1 ?        ./heartbeat
+<span class="ok">$ tail -n 2 /tmp/heartbeat.log</span>
+beat 5
+beat 6
+<span class="ok">$ kill 32</span></pre>
+<figure class="wide">
+<svg class="fig" viewBox="0 0 760 322" role="img" aria-label="Going to the background in two steps. Top band: tied to your terminal, pts/0, where Ctrl+C and hang-ups reach. Bottom band: the background, no terminal. Start: the shell, PID 25, starts ./heartbeat. Step 1: it forks child 32 and exits, so the prompt comes back; 32 is adopted by PID 1. Step 2: 32 calls setsid and moves to the background band: parent 1, tty question mark. It is the daemon, writing a beat every second.">
+  <rect x="12" y="44" width="736" height="116" rx="10" fill="#e3edfb" fill-opacity=".45" stroke="#2266d3" stroke-dasharray="5 4"/>
+  <rect x="12" y="186" width="736" height="124" rx="10" fill="#ecedef" fill-opacity=".6" stroke="#6b6f76" stroke-dasharray="5 4"/>
+  <text x="734" y="66" font-size="13" font-weight="700" fill="#2266d3" text-anchor="end" lang="en">tied to your terminal (pts/0)</text><text x="734" y="66" font-size="13" font-weight="700" fill="#2266d3" text-anchor="end" lang="zh-Hant">綁在你的終端機上（pts/0）</text>
+  <text x="734" y="84" font-size="11.5" font-weight="400" fill="#5a6779" text-anchor="end" lang="en">Ctrl+C and hang-ups reach it</text><text x="734" y="84" font-size="11.5" font-weight="400" fill="#5a6779" text-anchor="end" lang="zh-Hant">Ctrl+C 和掛斷會送到這裡</text>
+  <text x="26" y="208" font-size="13" font-weight="700" fill="#6b6f76" text-anchor="start" lang="en">background: no terminal</text><text x="26" y="208" font-size="13" font-weight="700" fill="#6b6f76" text-anchor="start" lang="zh-Hant">背景：沒有終端機</text>
+  <text x="26" y="226" font-size="11.5" font-weight="400" fill="#5a6779" text-anchor="start" lang="en">nothing on a terminal can reach it</text><text x="26" y="226" font-size="11.5" font-weight="400" fill="#5a6779" text-anchor="start" lang="zh-Hant">終端機上的事都碰不到它</text>
+  <text x="150" y="28" font-size="12.5" font-weight="700" fill="#0d1b2a" text-anchor="middle" lang="en">start</text><text x="150" y="28" font-size="12.5" font-weight="700" fill="#0d1b2a" text-anchor="middle" lang="zh-Hant">開始</text>
+  <text x="375" y="28" font-size="12.5" font-weight="700" fill="#0d1b2a" text-anchor="middle" lang="en">1. fork, parent exits</text><text x="375" y="28" font-size="12.5" font-weight="700" fill="#0d1b2a" text-anchor="middle" lang="zh-Hant">1. fork，父 process 結束</text>
+  <text x="600" y="28" font-size="12.5" font-weight="700" fill="#0d1b2a" text-anchor="middle" lang="en">2. setsid()</text><text x="600" y="28" font-size="12.5" font-weight="700" fill="#0d1b2a" text-anchor="middle" lang="zh-Hant">2. setsid()</text>
+  <rect x="104" y="52" width="92" height="26" rx="6" fill="#fff" stroke="#5a6779"/>
+  <text x="150" y="69" font-size="12" font-weight="400" fill="#5a6779" text-anchor="middle" lang="en">25 · shell</text><text x="150" y="69" font-size="12" font-weight="400" fill="#5a6779" text-anchor="middle" lang="zh-Hant">25 · shell</text>
+  <path d="M150 78 V95.0" stroke="#5a6779" stroke-width="1.2"/>
+  <rect x="75.0" y="95.0" width="150" height="46" rx="7" fill="#fff" stroke="#0d1b2a" stroke-width="1.5"/>
+  <text x="150" y="114" font-size="13" font-weight="700" fill="#0d1b2a" text-anchor="middle" lang="en">./heartbeat</text><text x="150" y="114" font-size="13" font-weight="700" fill="#0d1b2a" text-anchor="middle" lang="zh-Hant">./heartbeat</text>
+  <text x="150" y="131" font-size="11.5" font-weight="400" fill="#5a6779" text-anchor="middle" lang="en">parent 25</text><text x="150" y="131" font-size="11.5" font-weight="400" fill="#5a6779" text-anchor="middle" lang="zh-Hant">父 process 25</text>
+  <path d="M227.0 118 L289.0 118.0" stroke="#6b6f76" stroke-width="2"/>
+  <polygon points="298.0,118.0 289.0,113.0 289.0,123.0" fill="#6b6f76"/>
+  <text x="262.5" y="110" font-size="11.5" font-weight="700" fill="#6b6f76" text-anchor="middle" class="mono">fork()</text>
+  <rect x="300.0" y="95.0" width="150" height="46" rx="7" fill="#fff" stroke="#0d1b2a" stroke-width="1.5"/>
+  <text x="375" y="114" font-size="13" font-weight="700" fill="#0d1b2a" text-anchor="middle" lang="en">32 · child</text><text x="375" y="114" font-size="13" font-weight="700" fill="#0d1b2a" text-anchor="middle" lang="zh-Hant">32 · 子 process</text>
+  <text x="375" y="131" font-size="11.5" font-weight="400" fill="#5a6779" text-anchor="middle" lang="en">parent 1 (adopted)</text><text x="375" y="131" font-size="11.5" font-weight="400" fill="#5a6779" text-anchor="middle" lang="zh-Hant">父 process 1（被收養）</text>
+  <text x="375" y="85.0" font-size="11.5" font-weight="400" fill="#c2352b" text-anchor="middle" lang="en">✕ the parent exited: prompt is back</text><text x="375" y="85.0" font-size="11.5" font-weight="400" fill="#c2352b" text-anchor="middle" lang="zh-Hant">✕ 父 process 結束：提示字元回來了</text>
+  <path d="M452.0 132 L518.3 240.3" stroke="#6b6f76" stroke-width="2"/>
+  <polygon points="523.0,248.0 522.6,237.7 514.0,242.9" fill="#6b6f76"/>
+  <text x="521.5" y="178.0" font-size="11.5" font-weight="700" fill="#6b6f76" text-anchor="start" class="mono">setsid()</text>
+  <rect x="525.0" y="239.0" width="150" height="46" rx="7" fill="#dcf5f1" stroke="#00695e" stroke-width="1.5"/>
+  <text x="600" y="258" font-size="13" font-weight="700" fill="#00695e" text-anchor="middle" lang="en">32 · the daemon</text><text x="600" y="258" font-size="13" font-weight="700" fill="#00695e" text-anchor="middle" lang="zh-Hant">32 · daemon</text>
+  <text x="600" y="275" font-size="11.5" font-weight="400" fill="#5a6779" text-anchor="middle" lang="en">parent 1 · tty ?</text><text x="600" y="275" font-size="11.5" font-weight="400" fill="#5a6779" text-anchor="middle" lang="zh-Hant">父 process 1 · tty ?</text>
+  <text x="600" y="301.0" font-size="12" font-weight="700" fill="#00695e" text-anchor="middle" lang="en">writes a beat every second</text><text x="600" y="301.0" font-size="12" font-weight="700" fill="#00695e" text-anchor="middle" lang="zh-Hant">每秒寫一行 beat</text>
+</svg>
+<figcaption><span lang="en">The run above, step by step.</span><span lang="zh-Hant">上面那次執行，一步一步畫出來。</span></figcaption>
+</figure>
+<ol>
+  <li><span lang="en"><b>Fork, the parent exits.</b> Your shell waits for the program it started (Part 3). That program ends at once, so you get your prompt back, while its child keeps going. Like any orphan, the child is adopted by PID 1.</span><span lang="zh-Hant"><b>fork，父 process 結束。</b>shell 會等它啟動的程式結束（第 3 部分）。那個程式馬上就結束了，所以提示字元立刻回來，而它的子 process 繼續跑。跟所有孤兒一樣，子 process 由 PID 1 收養。</span></li>
+  <li><span lang="en"><b><code>setsid()</code>.</b> The child cuts its tie to the terminal. From then on, nothing that happens on that terminal reaches it: not Ctrl+C, not a hang‑up, not closing the window.</span><span lang="zh-Hant"><b><code>setsid()</code>。</b>子 process 切斷跟終端機的關係。從此終端機上發生的事都碰不到它：Ctrl+C、掛斷、關掉視窗都一樣。</span></li>
+</ol>
+<p lang="en">The daemon is 32: parent 1, and <code>?</code> in the <code>tty</code> column, which means no terminal. It kept writing after its terminal was gone, and only <code>kill</code> stopped it. <mark>Every daemon looks like this in <code>ps</code>: <code>tty</code> is <code>?</code>, and the parent is usually 1.</mark> Real daemons usually do a little more, such as forking a second time and closing their terminal input and output; look up "double fork" if you are curious.</p>
+<p lang="zh-Hant">daemon 是 32：父 process 是 1，<code>tty</code> 欄是 <code>?</code>，意思是沒有終端機。終端機不見了它還繼續寫，最後只有 <code>kill</code> 停得了它。<mark>每個 daemon 在 <code>ps</code> 裡都長這樣：<code>tty</code> 是 <code>?</code>，父 process 通常是 1。</mark>真正的 daemon 通常還會多做一點，例如再 fork 一次、關掉終端機的輸入和輸出；有興趣可以查「double fork」。</p>
+
+<h3><span lang="en">Daemons you will meet</span><span lang="zh-Hant">你會遇到的 daemon</span></h3>
+<p lang="en">Here is one from the container we used for the launch:</p>
+<p lang="zh-Hant">這是我們跑 launch 的那個容器裡的一個：</p>
 <pre class="term"><span class="ok">$ ps -e -o pid,ppid,tty,cmd</span>     <span class="m"># one line of it</span>
     PID    PPID TT       CMD
      86       1 ?        /usr/bin/python3 -c from ros2cli.daemon.daemonize import main; main() --name ros2-daemon ...</pre>
-<p lang="en">That is the <b>ROS 2 daemon</b>, started the first time you ran a <code>ros2</code> command. You will meet a few daemons:</p>
-<p lang="zh-Hant">那是 <b>ROS 2 daemon</b>，在你第一次執行 <code>ros2</code> 指令時就啟動了。你會遇到幾個 daemon：</p>
+<p lang="en">That is the <b>ROS 2 daemon</b>, started the first time you ran a <code>ros2</code> command. These are the daemons you will meet most:</p>
+<p lang="zh-Hant">那是 <b>ROS 2 daemon</b>，在你第一次執行 <code>ros2</code> 指令時就啟動了。你最常遇到的是這幾個 daemon：</p>
 <table class="t">
   <tr><th>Daemon</th><th><span lang="en">What it does</span><span lang="zh-Hant">做什麼</span></th><th><span lang="en">How to look at it</span><span lang="zh-Hant">怎麼查看它</span></th></tr>
   <tr><td><span lang="en">tmux server</span><span lang="zh-Hant">tmux server</span></td><td><span lang="en">holds terminals that survive when you disconnect</span><span lang="zh-Hant">保管斷線後還活著的終端機</span></td><td><code>tmux ls</code></td></tr>
@@ -624,8 +739,6 @@ tmux attach -t robot</pre>
 <div class="try">
   <div class="try-h"><span lang="en">Try it</span><span lang="zh-Hant">動手試</span></div>
   <div class="try-t"><span lang="en">Survive a dropped connection; catch a stale daemon</span><span lang="zh-Hant">撐過斷線；抓到過時的 daemon</span></div>
-  <p lang="en">The image has no tmux yet. In T1, install it once: <code>apt-get update &amp;&amp; apt-get install -y tmux psmisc</code> (<code>psmisc</code> gives <code>fuser</code> and <code>pstree</code>).</p>
-  <p lang="zh-Hant">image 裡還沒有 tmux。在 T1 裝一次：<code>apt-get update &amp;&amp; apt-get install -y tmux psmisc</code>（<code>psmisc</code> 提供 <code>fuser</code> 和 <code>pstree</code>）。</p>
   <ol>
     <li><span lang="en">In T2: <code>tmux new -s robot</code>, then <code>cd /code &amp;&amp; ros2 launch robot.launch.py</code> inside it. Close the T2 window entirely. In T1: <code>tmux ls</code> and <code>ps -e -o pid,ppid,tty,cmd --forest</code>. Then <code>tmux attach -t robot</code>.</span><span lang="zh-Hant">在 T2：<code>tmux new -s robot</code>，在裡面執行 <code>cd /code &amp;&amp; ros2 launch robot.launch.py</code>。把 T2 整個視窗關掉。在 T1：<code>tmux ls</code> 和 <code>ps -e -o pid,ppid,tty,cmd --forest</code>。然後 <code>tmux attach -t robot</code>。</span></li>
     <li><span lang="en">With the launch running, <code>fuser -v $(readlink /tmp/mcu)</code>. Which PIDs, and which programs are they?</span><span lang="zh-Hant">launch 還在跑時，執行 <code>fuser -v $(readlink /tmp/mcu)</code>。有哪些 PID？它們是哪些程式？</span></li>
@@ -680,13 +793,13 @@ uid=1000(member) gid=1000(member) groups=1000(member),5(tty)
 <h3><span lang="en">The <code>build/</code> folder you can't delete</span><span lang="zh-Hant">刪不掉的 <code>build/</code> 資料夾</span></h3>
 <p lang="en">A container usually runs as root. When it writes into a folder shared with your laptop, the files it creates belong to root on your laptop too, because a user is just a number and the kernel is shared. Here a container plays a build: it makes a folder and one file in it.</p>
 <p lang="zh-Hant">容器通常以 root 執行。當它寫入一個跟你筆電共用的資料夾時，它建立的檔案在你的筆電上也屬於 root，因為使用者只是一個編號，而核心是共用的。這裡用一個容器假裝在編譯：建一個資料夾，裡面放一個檔案。</p>
-<pre class="term"><span class="ok">$ docker run --rm -v "$PWD":/ws -w /ws dit-ros2-tutorial:humble \
+<pre class="term"><span class="ok">$ docker run --rm -v "$PWD":/ws -w /ws dit-course \
     bash -c 'mkdir -p build/my_pkg &amp;&amp; echo x &gt; build/my_pkg/out.o'</span>
 <span class="ok">$ ls -l build</span>
 drwxr-xr-x 2 root root 60 Nov 20 17:31 my_pkg
 <span class="ok">$ rm -r build</span>
 <span class="b">rm: cannot remove 'build/my_pkg/out.o': Permission denied</span>
-<span class="ok">$ docker run --rm -u "$(id -u):$(id -g)" -v "$PWD":/ws -w /ws dit-ros2-tutorial:humble \
+<span class="ok">$ docker run --rm -u "$(id -u):$(id -g)" -v "$PWD":/ws -w /ws dit-course \
     bash -c 'mkdir -p build/my_pkg &amp;&amp; echo x &gt; build/my_pkg/out.o'</span>
 <span class="ok">$ ls -l build</span>
 drwxr-xr-x 2 member member 60 Nov 20 17:31 my_pkg</pre>
@@ -792,8 +905,8 @@ openat(AT_FDCWD, "/opt/ros/humble/lib/librcl.so", O_RDONLY|O_CLOEXEC) = 3</pre>
 <pre class="term"><span class="ok">$ strace -f -e trace=openat python3 driver.py</span>
 <span class="m">...</span>
 [pid   532] openat(AT_FDCWD, "/tmp/mcu", O_RDONLY|O_CLOEXEC) = 15</pre>
-  <p lang="en">Install it with <code>apt-get install -y strace</code>. <code>-f</code> follows threads and children; <code>-e trace=</code> picks which calls to show; <code>-p PID</code> attaches to a process that is already running.</p>
-  <p lang="zh-Hant">用 <code>apt-get install -y strace</code> 安裝。<code>-f</code> 會跟著執行緒和子 process；<code>-e trace=</code> 選擇要顯示哪些呼叫；<code>-p PID</code> 可以接上一個已經在跑的 process。</p>
+  <p lang="en">It is already in the course container. <code>-f</code> follows threads and children; <code>-e trace=</code> picks which calls to show; <code>-p PID</code> attaches to a process that is already running.</p>
+  <p lang="zh-Hant">課程容器裡已經裝好了。<code>-f</code> 會跟著執行緒和子 process；<code>-e trace=</code> 選擇要顯示哪些呼叫；<code>-p PID</code> 可以接上一個已經在跑的 process。</p>
 </details>
 
 <details class="deeper">
@@ -870,7 +983,7 @@ lr-x------ 1 root root 64 Nov 20 09:29 11 -> /dev/shm/fastrtps_port7413_el
 
 <h2 id="credits" data-map="no"><small><span lang="en">Attribution</span><span lang="zh-Hant">出處</span></small><span lang="en">Credits</span><span lang="zh-Hant">致謝</span></h2>
 <ul class="credits">
-  <li><span lang="en">The code is in <code>code/</code>. Every example was run in <code>dit-ros2-tutorial:humble</code> (ROS 2 Humble) on 2026-11-20, and the outputs above are from those runs. ROS log timestamps and Python tracebacks were cut where marked; PIDs differ between runs.</span><span lang="zh-Hant">程式碼在 <code>code/</code>。每個範例都在 2026-11-20 於 <code>dit-ros2-tutorial:humble</code>（ROS 2 Humble）上執行過，上面的輸出都來自那些執行結果。ROS log 的時間戳記和 Python traceback 在標示處有刪減；每次執行的 PID 都不一樣。</span></li>
+  <li><span lang="en">The code is in <code>code/</code>. Every example was run in ROS 2 Humble containers (<code>ros:humble-ros-base-jammy</code>, the base of <code>dit-course</code>) on 2026-11-20 and 21, and the outputs above are from those runs. ROS log timestamps and Python tracebacks were cut where marked; PIDs differ between runs.</span><span lang="zh-Hant">程式碼在 <code>code/</code>。每個範例都在 2026-11-20 和 21 於 ROS 2 Humble 容器（<code>ros:humble-ros-base-jammy</code>，也就是 <code>dit-course</code> 的基底）上執行過，上面的輸出都來自那些執行結果。ROS log 的時間戳記和 Python traceback 在標示處有刪減；每次執行的 PID 都不一樣。</span></li>
   <li><span lang="en">The signal handling of <code>ros2 launch</code> is in <code>launch/launch_service.py</code> of ROS 2 Humble (Apache License 2.0).</span><span lang="zh-Hant"><code>ros2 launch</code> 處理 signal 的方式在 ROS 2 Humble 的 <code>launch/launch_service.py</code>（Apache License 2.0）。</span></li>
 </ul>
 

@@ -246,10 +246,9 @@
 <div class="try">
   <div class="try-h"><span lang="en">Try it</span><span lang="zh-Hant">動手試</span></div>
   <div class="try-t"><span lang="en">Freeze a node, then fix it</span><span lang="zh-Hant">讓 node 卡住，再修好它</span></div>
-  <p lang="en">You need the club's Humble image once (see <code>ros2-basics/verify/README.md</code> to build <code>dit-ros2-tutorial:humble</code>). From this worksheet's folder:</p>
-  <p lang="zh-Hant">需要先建好社團的 Humble image（照 <code>ros2-basics/verify/README.md</code> 建立 <code>dit-ros2-tutorial:humble</code>，只要做一次）。在這份學習單的資料夾裡：</p>
-<pre data-lang="sh">docker run -it --rm --name ws0 -v "$PWD/code":/code \
-    dit-ros2-tutorial:humble bash
+  <p lang="en">Do the one-time setup on the <a href="../index.html#before">course home page</a> if you haven't yet. Then, from the top of the repository:</p>
+  <p lang="zh-Hant">如果還沒做過，先照<a href="../index.html#before">課程首頁</a>做一次設定。然後在 repository 的最上層：</p>
+<pre data-lang="sh">docker run -it --rm --name ws0 -v "$PWD/_template/code":/code dit-course bash
 cd /code &amp;&amp; python3 slow_server.py</pre>
   <p lang="en">In a second terminal, <code>docker exec -it ws0 bash</code>, then <code>cd /code</code>. Before each run, say what you expect to see at t = 4 s.</p>
   <p lang="zh-Hant">開第二個終端機，<code>docker exec -it ws0 bash</code>，再 <code>cd /code</code>。每次執行前，先說出你預期 t = 4 秒時會看到什麼。</p>

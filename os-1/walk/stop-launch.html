@@ -135,7 +135,7 @@ const STEPS = [
       p1(s, '', '[python3-1] fake_mcu: /tmp/mcu -> /dev/pts/1');
       p1(s, '', '[INFO] [python3-2]: process started with pid [474]');
       p1(s, '', '[INFO] [python3-3]: process started with pid [476]');
-      return { hot: ['p-472', 'p-474', 'p-476'], arrows: [['p-471', 'p-474', 'flow', ['fork + exec', 'fork + exec']]] }; } },
+      return { hot: ['p-472', 'p-474', 'p-476'], call: { who: LAUNCHER, act: 'fork() + exec(...), three times', ret: 'PIDs 472, 474, 476' } }; } },
 
   { part: A, title: T('T2 looks at the tree', 'T2 看一下這棵樹'),
     narr: T(`In a second terminal, <code>ps</code> lists the processes with their PID and PPID, which is exactly this tree. <code>ros2 node list</code> shows the two nodes. The monitor prints the latest wheel ticks once a second.`,

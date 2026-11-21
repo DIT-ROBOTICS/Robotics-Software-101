@@ -1,0 +1,11 @@
+# Runs the example stack as a container's main command, the way a robot often does.
+#   docker compose up -d        start it
+#   time docker compose stop    stop it: about 10 s, unless stop_signal is set
+#   docker compose down         remove it
+services:
+  robot:
+    image: dit-course
+    volumes:
+      - ./:/code
+    command: ros2 launch /code/robot.launch.py
+    # stop_signal: SIGINT       # uncomment: a clean stop in a fraction of a second

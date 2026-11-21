@@ -189,7 +189,9 @@ belong to the presenter, and the hidden explanation (E) gives them the moment to
 
 ## Code
 
-Each course keeps its examples in `code/`. **Run every example** in a ROS 2 Humble container
+Each course keeps its examples in `code/`. All courses share one image, `dit-course`, built from
+`docker/Dockerfile`; add a course's tools there rather than asking students to `apt-get` them.
+**Run every example** in a ROS 2 Humble container
 before publishing, paste the real output into the worksheet, and say in the credits when and on
 what it was run. Code shown in a walkthrough is copied from `code/` with its real line numbers;
 change both together.

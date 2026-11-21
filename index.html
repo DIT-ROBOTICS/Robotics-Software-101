@@ -176,6 +176,20 @@
   <li><a href="https://ditrobotics.notion.site/Docker-2d6c8b048fcf8093b092f24de4ef1a95"><span lang="en">Docker tutorial (Notion)</span><span lang="zh-Hant">Docker 教學（Notion）</span></a></li>
 </ul>
 
+<h3><span lang="en">Set up once, for every course</span><span lang="zh-Hant">設定一次，所有課程通用</span></h3>
+<p lang="en">Every example in every course runs in one container: ROS 2 Humble plus the tools the worksheets use. Each course's example code is in its <code>code/</code> folder in this repository. On a laptop with Docker and network, do this once:</p>
+<p lang="zh-Hant">每堂課的每個範例都在同一個容器裡跑：ROS 2 Humble，加上學習單會用到的工具。每堂課的範例程式碼放在這個 repository 裡該課的 <code>code/</code> 資料夾。在有 Docker、有網路的筆電上做一次：</p>
+<pre data-lang="sh">git clone https://github.com/DIT-ROBOTICS/Robotics-Software-101.git
+# or, if your SSH key is on GitHub:
+git clone git@github.com:DIT-ROBOTICS/Robotics-Software-101.git
+
+cd Robotics-Software-101
+docker build -t dit-course docker/</pre>
+<p lang="en">No SSH key on GitHub yet? <a href="https://docs.github.com/en/authentication/connecting-to-github-with-ssh">GitHub's guide</a> shows how to make one and add it.</p>
+<p lang="zh-Hant">GitHub 上還沒有 SSH key？<a href="https://docs.github.com/en/authentication/connecting-to-github-with-ssh">GitHub 的說明</a>教你怎麼產生一把並加上去。</p>
+<p lang="en">The build downloads ROS 2 (about 1 GB), so do it at home, not on the room's Wi‑Fi. Before each course, <code>git pull</code> to get its code, and build again if <code>docker/Dockerfile</code> changed. Each worksheet starts with the one command that opens its container.</p>
+<p lang="zh-Hant">建置時會下載 ROS 2（大約 1 GB），請在家裡做，不要用教室的 Wi‑Fi。每堂課之前先 <code>git pull</code> 拿到這堂課的程式碼；如果 <code>docker/Dockerfile</code> 有改，就再建置一次。每份學習單一開始都會給你開啟容器的那一行指令。</p>
+
 <footer class="ws-foot"><span lang="en">DIT Robotics · Software courses</span><span lang="zh-Hant">DIT Robotics · 軟體課程</span></footer>
 </div>
 <script src="assets/worksheet.js"></script>

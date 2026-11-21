@@ -24,6 +24,7 @@ Course materials for the DIT robotics club. Read `README.md` (format and teachin
   distracting. Questions go in the worksheet or are asked by the presenter.
 - Follow `_template/`. Shared look and behaviour live in `assets/`; do not copy CSS or JS into
   individual pages (page-specific panel styles in a walkthrough's `<style>` are fine).
-- No ROS on the host. Run every example in a ROS 2 Humble container and show the output before
+- No ROS on the host. Run every example in the shared `dit-course` image (`docker/Dockerfile`,
+  one image for all courses) and show the output before
   claiming it works. Put real output in the worksheet.
 - Render every page in headless Chrome and look at the screenshot before calling it done.

@@ -288,7 +288,18 @@ State Estimation.)
 5. **Beyond CNNs:** Transformers; one slide each on RNN, self-supervised learning, generative
    models (autoregressive, diffusion).
 6. **Learning to act:** robot learning now: reinforcement learning, diffusion policy, VLAs (π0,
-   Gemini Robotics, GR00T); world (action) models, pixel vs latent space, JEPA.
+   Gemini Robotics, GR00T); world (action) models, pixel vs latent space, JEPA. Then **adapting a
+   big pretrained model to your robot**, compared side by side on what is trained, GPU memory,
+   data needed and risk:
+   - *Use it as is* (zero-shot, or just prompting a VLA).
+   - *Freeze the backbone*, train only a new head (linear probing): cheapest, least flexible.
+   - *Parameter-efficient fine-tuning*, mainly **LoRA**: the original weights stay frozen, and a
+     small low-rank update (a few % of the weights) is learned beside them; also adapters. Close
+     to full fine-tuning at a fraction of the memory; the adapter is a small file you can swap.
+   - *Full fine-tuning*: every weight trained; the most flexible and the most expensive, and it
+     can forget what the model knew before (catastrophic forgetting).
+   Rule of thumb: little data or a small GPU → freeze or LoRA; lots of data and compute → full
+   fine-tuning. (The detector in the running example is small enough to fine-tune fully.)
 
 **Go deeper:** collecting and labelling data; augmentation; evaluation metrics (mAP); training
 on simulated data.

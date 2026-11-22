@@ -838,6 +838,8 @@ drwxr-xr-x 2 root root 4096 Nov 21 02:25 os-1/code/__pycache__
 	librclcpp.so => not found
 	libexample_interfaces__rosidl_typesupport_cpp.so => not found
 	librcl.so => not found</pre>
+<p lang="en">The fix is <code>source /opt/ros/humble/setup.bash</code>. Sourcing your workspace's <code>install/setup.bash</code> does it too, because it first sources the ROS it was built with. (<code>install/local_setup.bash</code> doesn't: it adds only your own packages, so the libraries above stay missing.)</p>
+<p lang="zh-Hant">解法是 <code>source /opt/ros/humble/setup.bash</code>。source 你 workspace 的 <code>install/setup.bash</code> 也可以，因為它會先 source 建置時用的那個 ROS。（<code>install/local_setup.bash</code> 不會：它只加你自己的套件，上面那些函式庫還是找不到。）</p>
 
 <h3><span lang="en">What <code>source setup.bash</code> really does</span><span lang="zh-Hant"><code>source setup.bash</code> 到底做了什麼</span></h3>
 <p lang="en">It sets <b>environment variables</b>: settings that a process passes on to every process it starts. Three of them tell programs where to look:</p>
@@ -870,6 +872,27 @@ openat(AT_FDCWD, "/opt/ros/humble/lib/librcl.so", O_RDONLY|O_CLOEXEC) = 3</pre>
 <p lang="en">Because the search stops at the first match, <mark>which version of a package you run depends on what was sourced, and in which order</mark>. If a package exists in two workspaces, the one sourced last is in front. And a terminal keeps the variables from when you sourced: a terminal opened before a rebuild, or one that sourced another workspace, can run a different version from the one you just built. When "the change didn't do anything", check <code>ros2 pkg prefix</code> before you check your code.</p>
 <p lang="zh-Hant">因為搜尋在第一個找到時就停，<mark>你跑的是套件的哪個版本，取決於 source 了什麼、以什麼順序</mark>。如果一個套件存在於兩個 workspace，最後 source 的那個排在前面。而終端機會保留你 source 當時的變數：在重新編譯前就開著的終端機，或 source 了別的 workspace 的終端機，跑的版本可能跟你剛建好的不一樣。遇到「改了卻沒效果」時，先查 <code>ros2 pkg prefix</code>，再查你的程式。</p>
 
+<h3><span lang="en">When to source again</span><span lang="zh-Hant">什麼時候要重新 source</span></h3>
+<p lang="en">Sourcing your workspace adds one folder per package to these lists: <code>install/my_pkg</code>, <code>install/other_pkg</code>, and so on. Sourcing it again doesn't add them twice: the script removes a folder before it adds it. So <mark>you need to source again only when a new package folder appears, or in a new terminal</mark>. A changed file needs <code>colcon build</code> instead: a normal build copies your files into <code>install/</code>, and the copy is what runs.</p>
+<p lang="zh-Hant">source 你的 workspace，會把每個套件的一個資料夾加進這些清單：<code>install/my_pkg</code>、<code>install/other_pkg</code> 等等。再 source 一次不會加兩次：腳本會先把資料夾拿掉再加回去。所以<mark>只有出現新的套件資料夾，或開了新的終端機時，才需要重新 source</mark>。改了檔案要做的是 <code>colcon build</code>：一般的 build 會把你的檔案複製到 <code>install/</code>，真正被執行的是那份複本。</p>
+<table class="t">
+  <tr><th><span lang="en">What changed</span><span lang="zh-Hant">改了什麼</span></th><th><code>colcon build</code>?</th><th><span lang="en">Source again?</span><span lang="zh-Hant">重新 source？</span></th></tr>
+  <tr><td><span lang="en">Code in a package you already built</span><span lang="zh-Hant">已經建過的套件裡的程式碼</span></td><td><span lang="en">yes</span><span lang="zh-Hant">要</span></td><td><span lang="en">no</span><span lang="zh-Hant">不用</span></td></tr>
+  <tr><td><span lang="en">A new node in that package</span><span lang="zh-Hant">那個套件裡多一個新的 node</span></td><td><span lang="en">yes</span><span lang="zh-Hant">要</span></td><td><span lang="en">no</span><span lang="zh-Hant">不用</span></td></tr>
+  <tr><td><span lang="en">A new package</span><span lang="zh-Hant">一個新的套件</span></td><td><span lang="en">yes</span><span lang="zh-Hant">要</span></td><td><span lang="en"><b>yes</b>: its folder in <code>install/</code> is new</span><span lang="zh-Hant"><b>要</b>：它在 <code>install/</code> 裡的資料夾是新的</span></td></tr>
+  <tr><td><span lang="en">Nothing, but you opened a new terminal</span><span lang="zh-Hant">什麼都沒改，但開了新的終端機</span></td><td><span lang="en">no</span><span lang="zh-Hant">不用</span></td><td><span lang="en"><b>yes</b>: a new terminal starts without the variables</span><span lang="zh-Hant"><b>要</b>：新的終端機一開始沒有這些變數</span></td></tr>
+  <tr><td><span lang="en">Python code, built with <code>colcon build --symlink-install</code></span><span lang="zh-Hant">Python 程式碼，用 <code>colcon build --symlink-install</code> 建的</span></td><td><span lang="en">no: <code>install/</code> links to your files instead of copying them</span><span lang="zh-Hant">不用：<code>install/</code> 連結到你的檔案，而不是複製它們</span></td><td><span lang="en">no</span><span lang="zh-Hant">不用</span></td></tr>
+</table>
+<p lang="en">Forget to source after adding a package, and ROS can't find it, even though it built fine:</p>
+<p lang="zh-Hant">加了新套件卻忘了 source，ROS 就找不到它，即使它建置成功：</p>
+<pre class="term"><span class="ok">$ colcon build</span>                  <span class="m"># pkg_b is a new package</span>
+Summary: 2 packages finished [0.96s]
+<span class="ok">$ ros2 run pkg_b hi</span>
+<span class="b">Package 'pkg_b' not found</span>
+<span class="ok">$ source install/setup.bash</span>
+<span class="ok">$ ros2 run pkg_b hi</span>
+Hi from pkg_b.</pre>
+
 <h3><span lang="en">Plugins: loaded by name, at run time</span><span lang="zh-Hant">plugin：在執行時依名字載入</span></h3>
 <p lang="en">Some libraries aren't listed by <code>ldd</code> at all. A <b>plugin</b> is a shared library that a program loads while running, because a parameter or a configuration file names it. Navigation stacks choose their planner and controller this way, and <code>ros2_control</code> loads hardware drivers this way. The program was built without knowing the plugin exists, so <mark>a missing or broken plugin shows up only when the program runs</mark>: a message such as "failed to load plugin" or "undefined symbol" in the log, often from a plugin built against a different version of its library. The checks are the same as above: is the package found (<code>ros2 pkg prefix</code>), and was it built in the workspace you sourced?</p>
 <p lang="zh-Hant">有些函式庫根本不會出現在 <code>ldd</code> 裡。<b>plugin</b> 是程式在執行中才載入的共享函式庫，因為某個參數或設定檔指名了它。導航系統就是這樣選擇它的 planner 和 controller，<code>ros2_control</code> 也是這樣載入硬體驅動。程式編譯時並不知道這個 plugin 存在，所以<mark>plugin 不見或壞掉，只有在程式執行時才會出現</mark>：log 裡出現 "failed to load plugin" 或 "undefined symbol" 之類的訊息，常常是因為 plugin 是對著另一個版本的函式庫編譯的。檢查方式跟上面一樣：找得到這個套件嗎（<code>ros2 pkg prefix</code>）？它是在你 source 的那個 workspace 裡建的嗎？</p>
@@ -883,7 +906,7 @@ openat(AT_FDCWD, "/opt/ros/humble/lib/librcl.so", O_RDONLY|O_CLOEXEC) = 3</pre>
   <div class="try-h"><span lang="en">Try it</span><span lang="zh-Hant">動手試</span></div>
   <div class="try-t"><span lang="en">Permission denied, then a missing library</span><span lang="zh-Hant">permission denied，然後是找不到函式庫</span></div>
   <ol>
-    <li><span lang="en">In T2: <code>python3 /code/fake_mcu.py &amp;</code>, then <code>ls -l /tmp/mcu $(readlink /tmp/mcu)</code>. Read the permissions aloud: who may read?</span><span lang="zh-Hant">在 T2：<code>python3 /code/fake_mcu.py &amp;</code>，再 <code>ls -l /tmp/mcu $(readlink /tmp/mcu)</code>。把權限唸出來：誰可以讀？</span></li>
+    <li><span lang="en">In T2: <code>python3 /code/fake_mcu.py &amp;</code>, then <code>ls -l /tmp/mcu</code> and <code>ls -lL /tmp/mcu</code>. Read the permissions aloud: who may read?</span><span lang="zh-Hant">在 T2：<code>python3 /code/fake_mcu.py &amp;</code>，再 <code>ls -l /tmp/mcu</code> 和 <code>ls -lL /tmp/mcu</code>。把權限唸出來：誰可以讀？</span></li>
     <li><span lang="en"><code>useradd -m member</code>, then <code>su member -s /bin/bash -c "source /opt/ros/humble/setup.bash; python3 /code/driver.py"</code>. Fix it with a group, without making <code>member</code> root.</span><span lang="zh-Hant"><code>useradd -m member</code>，再 <code>su member -s /bin/bash -c "source /opt/ros/humble/setup.bash; python3 /code/driver.py"</code>。用群組修好它，不要讓 <code>member</code> 變成 root。</span></li>
     <li><span lang="en"><code>ldd ~/tutorial_ws/install/my_pkg/lib/my_pkg/slow_server</code>. Then run the same program with <code>env -i</code> in front (an empty environment) and read the error.</span><span lang="zh-Hant"><code>ldd ~/tutorial_ws/install/my_pkg/lib/my_pkg/slow_server</code>。再在同一個程式前面加 <code>env -i</code>（空的環境）執行，讀錯誤訊息。</span></li>
   </ol>

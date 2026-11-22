@@ -26,8 +26,9 @@ Core total: 3 h 55 min, not counting breaks and questions.
 
 ## Presenting
 
-Open the worksheet, press P, then "Start live" and show the PIN. Students press P and join with it.
-← → or a clicker move; K is the laser. Opening walkthrough 1 from its slide takes everyone with you.
+Open the worksheet and press P. ← → or a clicker move between slides, Esc goes back to the page.
+K is the laser, on the slides and in the walkthrough. Members follow on their own laptops by
+scrolling the worksheet.
 
 ## Before the session
 

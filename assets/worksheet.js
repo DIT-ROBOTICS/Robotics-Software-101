@@ -138,7 +138,7 @@
   });
 })();
 
-/* present mode, laser and live sessions: present.js, next to this file */
+/* present mode and the laser: present.js, next to this file */
 (function () {
   const me = document.currentScript; if (!me) return;
   const s = document.createElement('script'); s.src = me.src.replace(/[^/]*$/, 'present.js'); document.body.append(s);

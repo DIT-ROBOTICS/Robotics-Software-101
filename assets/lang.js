@@ -17,6 +17,13 @@
 
    The choice is kept in this browser. ?lang=zh (or ?lang=en) in a link overrides it. */
 (function () {
+  // the tab icon, for every page that loads this file (assets/favicon.svg, next to it)
+  const me = document.currentScript;
+  if (me && !document.querySelector('link[rel~="icon"]')) {
+    const icon = document.createElement('link');
+    icon.rel = 'icon'; icon.type = 'image/svg+xml'; icon.href = me.src.replace(/lang\.js.*$/, 'favicon.svg');
+    document.head.append(icon);
+  }
   const KEY = 'dit-lang';
   let lang = 'en';
   try { if (localStorage.getItem(KEY) === 'zh') lang = 'zh'; } catch (e) {}

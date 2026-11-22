@@ -78,6 +78,7 @@
       bar.firstChild.style.width = (100 * on / boxes.length) + '%';
     }
     const p = document.createElement('p');
+    p.dataset.present = 'no';   // a reader's tool: not on the slides
     p.innerHTML = `<button type="button" class="goalreset">${T2('Reset checklist', '清除勾選')}</button> <span class="muted" style="font-size:.88rem">${T2('Ticks are saved only in this browser.', '勾選只存在這個瀏覽器裡。')}</span>`;
     p.querySelector('button').addEventListener('click', () => { saved = {}; store.set(key, saved); boxes.forEach(b => { b.checked = false; }); paint(); });
     list.after(p);
@@ -135,4 +136,10 @@
     pre.addEventListener('mouseleave', () => set(null));
     pre.addEventListener('click', ev => { const el = ev.target.closest('.hl'); set(el === cur ? null : el); }); // touch screens
   });
+})();
+
+/* present mode, laser and live sessions: present.js, next to this file */
+(function () {
+  const me = document.currentScript; if (!me) return;
+  const s = document.createElement('script'); s.src = me.src.replace(/[^/]*$/, 'present.js'); document.body.append(s);
 })();

@@ -1,0 +1,8 @@
+{
+  "name": "dit-courses-server",
+  "private": true,
+  "type": "module",
+  "description": "The course site and its live-session relay (see README.md)",
+  "scripts": { "start": "node server.mjs" },
+  "dependencies": { "ws": "8.18.3" }
+}

@@ -3,3 +3,8 @@ __pycache__/
 build/
 install/
 log/
+node_modules/
+.wrangler/
+.env
+os-1/code/tiny_shell
+os-1/code/heartbeat

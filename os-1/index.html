@@ -19,8 +19,8 @@
     <h1><span lang="en">Ctrl+C Is Not Enough: the Life and Death of a Process</span><span lang="zh-Hant">Ctrl+C 不夠用：process 的生與死</span></h1>
     <p class="lead" lang="en">Every node you start is a Linux <span class="who a">process</span>, and the <span class="who os">Linux kernel</span> decides how it starts, how it stops and what it may touch. In this session we start a small robot stack, try to stop it, and fail. Then we find out why. On the way you learn the operating-system ideas behind most "it won't stop", "it died when SSH dropped", "permission denied" and "works on my machine" problems: processes, signals, daemons, file permissions and shared libraries.</p>
     <p class="lead" lang="zh-Hant">你啟動的每個 node 都是一個 Linux <span class="who a">process</span>，而 <span class="who os">Linux 核心</span>決定它怎麼啟動、怎麼停止、可以碰什麼。這堂課我們啟動一個小小的機器人系統，試著把它停掉，結果失敗了；然後找出原因。過程中你會學到大部分「停不下來」、「SSH 一斷就死掉」、「permission denied」、「在我電腦上可以跑」問題背後的作業系統觀念：process、signal、daemon、檔案權限和共享函式庫。</p>
-    <p class="howto" lang="en"><b>How to use this page.</b> The numbered Parts are what we do together in the session. Boxes and Parts marked <b>Go deeper</b> hold ideas that take longer to sink in: come back to them after the session. Every command here runs in the course container: see <b>Before the session</b> below. The <b>中文</b> button (or the L key) switches the page to Chinese.</p>
-    <p class="howto" lang="zh-Hant"><b>怎麼用這一頁。</b>有編號的部分是課堂上一起做的。標成<b>延伸</b>的方塊和部分，放的是比較需要時間消化的觀念，課後再回來看。這裡每個指令都在課程容器裡跑：見下面的<b>上課前</b>。<b>English</b> 按鈕（或 L 鍵）可以切回英文。</p>
+    <p class="howto" lang="en"><b>How to use this page.</b> The numbered Parts are what we do together in the session. Boxes and Parts marked <b>Go deeper</b> hold ideas that take longer to sink in: come back to them after the session. Every command here runs in the course container: see <b>Before the session</b> below. The <b>中文</b> button (or the L key) switches the page to Chinese. In class, press P and join the presenter's PIN to follow along.</p>
+    <p class="howto" lang="zh-Hant"><b>怎麼用這一頁。</b>有編號的部分是課堂上一起做的。標成<b>延伸</b>的方塊和部分，放的是比較需要時間消化的觀念，課後再回來看。這裡每個指令都在課程容器裡跑：見下面的<b>上課前</b>。<b>English</b> 按鈕（或 L 鍵）可以切回英文。上課時按 P，輸入講者的 PIN，就能跟著講者的畫面走。</p>
   </div>
 </div>
 
@@ -757,38 +757,37 @@ uid=1000(member) gid=1000(member) groups=1000(member)</pre>
 <p lang="zh-Hant"><code>uid</code> 是你的使用者編號，<code>groups</code> 列出你所在的每個群組。使用者 0 是 <b>root</b>，所有檢查都會通過。在我們的容器裡，每個 process 都以 root 執行（<code>/proc</code> 裡的 <code>Uid: 0</code>），所以到目前為止都沒有被拒絕過。</p>
 
 <h3><span lang="en">Reading <code>ls -l</code></span><span lang="zh-Hant">讀懂 <code>ls -l</code></span></h3>
-<p lang="en">A device is a file too. Our serial port has a friendly name, <code>/tmp/mcu</code>, that points to the real device:</p>
-<p lang="zh-Hant">裝置也是檔案。我們的序列埠有一個好記的名字 <code>/tmp/mcu</code>，它指向真正的裝置：</p>
-<pre class="term"><span class="ok">$ ls -l /tmp/mcu /dev/pts/0</span>
-lrwxrwxrwx 1 root root 10 Nov 20 09:28 /tmp/mcu -> /dev/pts/0
-crw--w---- 1 root tty 136, 0 Nov 20 09:28 /dev/pts/0</pre>
+<p lang="en">A device is a file too, with an owner and permissions like any other. Our serial port is <code>/tmp/mcu</code>. Plain <code>ls -l</code> shows that this name is only a shortcut (type <code>l</code>, a link) to the real device, and a link's own permissions are never checked. <code>-L</code> shows the device behind it:</p>
+<p lang="zh-Hant">裝置也是檔案，跟其他檔案一樣有擁有者和權限。我們的序列埠是 <code>/tmp/mcu</code>。直接 <code>ls -l</code> 會看到這個名字只是指向真正裝置的捷徑（類型 <code>l</code>，連結），而連結自己的權限從來不會被檢查。<code>-L</code> 顯示它背後的裝置：</p>
+<pre class="term"><span class="ok">$ ls -l /tmp/mcu</span>
+lrwxrwxrwx 1 root root 10 Nov 22 12:11 /tmp/mcu -&gt; /dev/pts/0
+<span class="ok">$ ls -lL /tmp/mcu</span>
+crw-rw---- 1 root dialout 136, 0 Nov 22 12:11 /tmp/mcu</pre>
 <figure>
 <table class="t">
-  <tr><td><b><code>c</code></b></td><td><b><code>rw-</code></b></td><td><b><code>-w-</code></b></td><td><b><code>---</code></b></td><td><b><code>root</code></b></td><td><b><code>tty</code></b></td></tr>
+  <tr><td><b><code>c</code></b></td><td><b><code>rw-</code></b></td><td><b><code>rw-</code></b></td><td><b><code>---</code></b></td><td><b><code>root</code></b></td><td><b><code>dialout</code></b></td></tr>
   <tr><td><span lang="en">type: <code>c</code> a device, <code>l</code> a link, <code>d</code> a folder, <code>-</code> a file</span><span lang="zh-Hant">類型：<code>c</code> 裝置、<code>l</code> 連結、<code>d</code> 資料夾、<code>-</code> 檔案</span></td><td><span lang="en">what the owner may do</span><span lang="zh-Hant">擁有者可以做的事</span></td><td><span lang="en">what the group may do</span><span lang="zh-Hant">群組可以做的事</span></td><td><span lang="en">what everyone else may do</span><span lang="zh-Hant">其他人可以做的事</span></td><td><span lang="en">owner</span><span lang="zh-Hant">擁有者</span></td><td><span lang="en">group</span><span lang="zh-Hant">群組</span></td></tr>
 </table>
 </figure>
-<p lang="en"><code>r</code> is read, <code>w</code> is write, and <code>-</code> means no. (For a folder, <code>x</code> means you may enter it; for a file, run it.) The kernel uses <mark>the first set that applies to you: owner, else group, else everyone else</mark>. The link <code>/tmp/mcu</code> shows <code>rwxrwxrwx</code>, but that means nothing: the check is made on the file it points to.</p>
-<p lang="zh-Hant"><code>r</code> 是讀、<code>w</code> 是寫，<code>-</code> 是不行。（對資料夾來說，<code>x</code> 是可以進去；對檔案來說，是可以執行。）核心使用<mark>第一組適用於你的權限：擁有者，不是的話看群組，再不是就看其他人</mark>。連結 <code>/tmp/mcu</code> 顯示 <code>rwxrwxrwx</code>，但那沒有意義：檢查的是它指向的那個檔案。</p>
+<p lang="en"><code>r</code> is read, <code>w</code> is write, and <code>-</code> means no. (For a program, <code>x</code> means you may run it; for a folder, enter it.) The kernel uses <mark>the first set that applies to you: owner, else group, else everyone else</mark>. So this port is for <code>root</code> and the members of group <code>dialout</code>, and nobody else. That is exactly how a real USB serial port, such as <code>/dev/ttyUSB0</code>, looks on Linux. (Where a file shows its size, a device shows two numbers, <code>136, 0</code>, that the kernel uses to find it. You can skip them.)</p>
+<p lang="zh-Hant"><code>r</code> 是讀、<code>w</code> 是寫，<code>-</code> 是不行。（對程式來說，<code>x</code> 是可以執行；對資料夾來說，是可以進去。）核心使用<mark>第一組適用於你的權限：擁有者，不是的話看群組，再不是就看其他人</mark>。所以這個序列埠只給 <code>root</code> 和 <code>dialout</code> 群組的成員用，其他人都不行。真正的 USB 序列埠在 Linux 上就長這樣，例如 <code>/dev/ttyUSB0</code>。（一般檔案顯示大小的地方，裝置顯示的是兩個數字 <code>136, 0</code>，是核心用來找到它的編號，可以跳過。）</p>
 
-<p lang="en">Now run the driver as <code>member</code>, an ordinary user. <code>member</code> is not root, not the owner, and not in group <code>tty</code>, so the last set applies: <code>---</code>.</p>
-<p lang="zh-Hant">現在以一般使用者 <code>member</code> 執行 driver。<code>member</code> 不是 root、不是擁有者、也不在 <code>tty</code> 群組，所以適用最後一組：<code>---</code>。</p>
+<p lang="en">Now run the driver as <code>member</code>, an ordinary user we added with <code>useradd -m member</code>. <code>member</code> is not root, and not in group <code>dialout</code>, so the last set applies: <code>---</code>.</p>
+<p lang="zh-Hant">現在以 <code>member</code> 執行 driver，這是我們用 <code>useradd -m member</code> 加的一般使用者。<code>member</code> 不是 root，也不在 <code>dialout</code> 群組，所以適用最後一組：<code>---</code>。</p>
 <pre class="term"><span class="ok">$ su member -s /bin/bash -c "source /opt/ros/humble/setup.bash; python3 /code/driver.py"</span>
 <span class="m">...</span>
   File "/code/driver.py", line 15, in __init__
     self.dev = open(DEVICE, 'rb', buffering=0)   # a device is opened like any file
 <span class="b">PermissionError: [Errno 13] Permission denied: '/tmp/mcu'</span></pre>
-<p lang="en">The fix is not to run everything as root. Give the group read and write, and put the user in the group:</p>
-<p lang="zh-Hant">解法不是什麼都用 root 跑。而是讓群組可以讀寫，再把使用者加進那個群組：</p>
-<pre class="term"><span class="ok">$ chmod g+rw /dev/pts/0 &amp;&amp; usermod -aG tty member</span>
-<span class="ok">$ ls -l /dev/pts/0</span>
-crw-rw---- 1 root tty 136, 0 Nov 20 09:28 /dev/pts/0
-<span class="ok">$ su member -c id</span>
-uid=1000(member) gid=1000(member) groups=1000(member),5(tty)
+<p lang="en">The fix is not to run everything as root. Put the user in the group that is allowed:</p>
+<p lang="zh-Hant">解法不是什麼都用 root 跑，而是把使用者加進被允許的那個群組：</p>
+<pre class="term"><span class="ok">$ usermod -aG dialout member</span>
+<span class="ok">$ id member</span>
+uid=1000(member) gid=1000(member) groups=1000(member),20(dialout)
 <span class="ok">$ su member -s /bin/bash -c "source /opt/ros/humble/setup.bash; python3 /code/driver.py"</span>
 <span class="a">[INFO] [driver]: reading /tmp/mcu</span></pre>
-<p lang="en">A real USB serial adapter shows up as something like <code>/dev/ttyUSB0</code> or <code>/dev/ttyACM0</code>, <code>crw-rw----</code>, group <code>dialout</code>. So on your own Linux laptop the fix is <code>sudo usermod -aG dialout $USER</code>, then log out and in again: <mark>a process gets its groups when it starts, so a shell that is already running doesn't have the new one</mark>.</p>
-<p lang="zh-Hant">真正的 USB 序列轉接器會顯示成 <code>/dev/ttyUSB0</code> 或 <code>/dev/ttyACM0</code> 之類的名字，<code>crw-rw----</code>，群組 <code>dialout</code>。所以在你自己的 Linux 筆電上，解法是 <code>sudo usermod -aG dialout $USER</code>，然後登出再登入：<mark>process 在啟動時取得它的群組，已經在跑的 shell 不會有新的群組</mark>。</p>
+<p lang="en">On your own Linux laptop, the fix for a USB serial port is the same: <code>sudo usermod -aG dialout $USER</code>, then log out and in again. <mark>A process gets its groups when it starts, so a shell that is already running doesn't have the new one.</mark></p>
+<p lang="zh-Hant">在你自己的 Linux 筆電上，USB 序列埠的解法也一樣：<code>sudo usermod -aG dialout $USER</code>，然後登出再登入。<mark>process 在啟動時取得它的群組，已經在跑的 shell 不會有新的群組。</mark></p>
 
 <h3><span lang="en">The <code>build/</code> folder you can't delete</span><span lang="zh-Hant">刪不掉的 <code>build/</code> 資料夾</span></h3>
 <p lang="en">A container usually runs as root. When it writes into a folder shared with your laptop, the files it creates belong to root on your laptop too, because a user is just a number and the kernel is shared. Here a container plays a build: it makes a folder and one file in it.</p>
@@ -805,6 +804,15 @@ drwxr-xr-x 2 root root 60 Nov 20 17:31 my_pkg
 drwxr-xr-x 2 member member 60 Nov 20 17:31 my_pkg</pre>
 <p lang="en">With <code>-u</code>, the container runs as your user number, so its files are yours. This is why many compose files and Dockerfiles take a user ID as a setting. If it already happened, delete the folder from inside a container, as root.</p>
 <p lang="zh-Hant">加上 <code>-u</code>，容器就以你的使用者編號執行，它建立的檔案就是你的。這就是為什麼很多 compose 檔和 Dockerfile 都把使用者 ID 當成一個設定。如果已經發生了，就從容器裡面以 root 刪掉那個資料夾。</p>
+<p lang="en">Our course container does this too. It runs as root (this Part needs root inside it, to add the user <code>member</code>), and <code>-v</code> shares your <code>os-1/code</code> folder with it. When the launch file ran in Part 1, Python left a folder of cached code there, <code>__pycache__</code>, and on a Linux laptop it belongs to root, just like <code>build/</code>:</p>
+<p lang="zh-Hant">我們的課程容器也會這樣。它以 root 執行（這個部分需要在容器裡當 root，才能新增使用者 <code>member</code>），而 <code>-v</code> 把你的 <code>os-1/code</code> 資料夾分享給它。第 1 部分跑 launch 檔時，Python 在那裡留下一個放快取程式碼的資料夾 <code>__pycache__</code>，在 Linux 筆電上它屬於 root，跟 <code>build/</code> 一樣：</p>
+<pre class="term"><span class="m"># on your laptop, at the top of the repository</span>
+<span class="ok">$ ls -ld os-1/code/__pycache__</span>
+drwxr-xr-x 2 root root 4096 Nov 21 02:25 os-1/code/__pycache__
+<span class="ok">$ rm -r os-1/code/__pycache__</span>
+<span class="b">rm: cannot remove 'os-1/code/__pycache__/robot.launch.cpython-310.pyc': Permission denied</span>
+<span class="m"># inside the container, where you are root</span>
+<span class="ok">$ rm -r /code/__pycache__</span></pre>
 
 <div class="case robot">
   <div class="case-h"><span lang="en">On a robot</span><span lang="zh-Hant">在機器人上</span></div>
@@ -983,7 +991,7 @@ lr-x------ 1 root root 64 Nov 20 09:29 11 -> /dev/shm/fastrtps_port7413_el
 
 <h2 id="credits" data-map="no"><small><span lang="en">Attribution</span><span lang="zh-Hant">出處</span></small><span lang="en">Credits</span><span lang="zh-Hant">致謝</span></h2>
 <ul class="credits">
-  <li><span lang="en">The code is in <code>code/</code>. Every example was run in ROS 2 Humble containers (<code>ros:humble-ros-base-jammy</code>, the base of <code>dit-course</code>) on 2026-11-20 and 21, and the outputs above are from those runs. ROS log timestamps and Python tracebacks were cut where marked; PIDs differ between runs.</span><span lang="zh-Hant">程式碼在 <code>code/</code>。每個範例都在 2026-11-20 和 21 於 ROS 2 Humble 容器（<code>ros:humble-ros-base-jammy</code>，也就是 <code>dit-course</code> 的基底）上執行過，上面的輸出都來自那些執行結果。ROS log 的時間戳記和 Python traceback 在標示處有刪減；每次執行的 PID 都不一樣。</span></li>
+  <li><span lang="en">The code is in <code>code/</code>. Every example was run in ROS 2 Humble containers (<code>ros:humble-ros-base-jammy</code>, the base of <code>dit-course</code>) from 2026-11-20 to 22, and the outputs above are from those runs. ROS log timestamps and Python tracebacks were cut where marked; PIDs differ between runs.</span><span lang="zh-Hant">程式碼在 <code>code/</code>。每個範例都在 2026-11-20 到 22 之間於 ROS 2 Humble 容器（<code>ros:humble-ros-base-jammy</code>，也就是 <code>dit-course</code> 的基底）上執行過，上面的輸出都來自那些執行結果。ROS log 的時間戳記和 Python traceback 在標示處有刪減；每次執行的 PID 都不一樣。</span></li>
   <li><span lang="en">The signal handling of <code>ros2 launch</code> is in <code>launch/launch_service.py</code> of ROS 2 Humble (Apache License 2.0).</span><span lang="zh-Hant"><code>ros2 launch</code> 處理 signal 的方式在 ROS 2 Humble 的 <code>launch/launch_service.py</code>（Apache License 2.0）。</span></li>
 </ul>
 

@@ -24,6 +24,11 @@ short" before the session. Have the container running before the session starts 
 
 Core total: 3 h 45 min, not counting breaks and questions.
 
+## Presenting
+
+Open the worksheet, press P, then "Start live" and show the PIN. Students press P and join with it.
+← → or a clicker move; K is the laser. Opening walkthrough 1 from its slide takes everyone with you.
+
 ## Before the session
 
 Ask everyone to do the one-time setup on the home page ("Before you start") at home: the build

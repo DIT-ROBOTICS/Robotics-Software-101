@@ -244,6 +244,7 @@ function arrow(fromId, toId, cls, label) {
     ({ s: state, h: H } = compute(current));
     render();
     history.replaceState(null, '', '#' + (current + 1));
+    document.dispatchEvent(new CustomEvent('dit-step', { detail: current }));
   }
 
   function start() {
@@ -269,4 +270,10 @@ function arrow(fromId, toId, cls, label) {
     if (document.fonts && document.fonts.ready) document.fonts.ready.then(drawArrows);
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start); else start();
+})();
+
+/* present mode, laser and live sessions: present.js, next to this file */
+(function () {
+  const me = document.currentScript; if (!me) return;
+  const s = document.createElement('script'); s.src = me.src.replace(/[^/]*$/, 'present.js'); document.body.append(s);
 })();

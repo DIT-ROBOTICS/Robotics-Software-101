@@ -1,0 +1,90 @@
+/* present.css: present mode, the laser and the live pill (see present.js). Same palette as worksheet.css. */
+
+/* ---------- present mode: the page becomes one slide at a time ---------- */
+html.presenting { font-size: clamp(16px, 1.4vw, 28px); }
+html.presenting body { overflow: hidden; padding-left: 0 !important; }
+html.presenting nav.map, html.presenting .p-start { display: none !important; }
+html.presenting .ws {
+  position: fixed; inset: 0 0 3.1rem 0; max-width: none; margin: 0; overflow: auto;
+  padding: 2.4rem max(3rem, calc((100vw - 60rem) / 2)) 2rem; background: var(--bg, #f3f5f8);
+}
+html.presenting:not(.p-measure) .ws > *:not(.p-on) { display: none !important; }
+html.presenting .ws > [data-present="no"] { display: none !important; }   /* reader-only blocks */
+html.presenting .ws > .p-on:first-child, html.presenting .ws > h2.p-on { margin-top: 0; }
+html.presenting .ws h2 { font-size: 2.1rem; }
+
+.p-bar {
+  position: fixed; left: 0; right: 0; bottom: 0; height: 3.1rem; z-index: 30;
+  display: flex; align-items: center; gap: .6rem; padding: 0 9rem 0 .8rem;
+  background: var(--ink, #0d1b2a); color: #e8eef5; font: 600 .82rem var(--sans, sans-serif);
+}
+.p-bar[hidden] { display: none; }
+.p-bar button {
+  font: inherit; color: inherit; background: transparent; border: 1px solid rgba(255,255,255,.25);
+  border-radius: 6px; padding: .3rem .7rem; cursor: pointer;
+}
+.p-bar button:hover:not(:disabled) { background: rgba(255,255,255,.1); }
+.p-bar button:disabled { opacity: .35; cursor: default; }
+.p-bar .p-prev, .p-bar .p-next { font-size: 1.1rem; line-height: 1; padding: .2rem .65rem; }
+.p-bar .p-no { font-family: var(--mono, monospace); min-width: 4.5em; text-align: center; color: #b9c4d2; }
+.p-bar .p-crumb { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #b9c4d2; font-weight: 500; }
+.p-bar .p-crumb code { color: inherit; background: transparent; }
+/* the language switch sits at the right end of the bar */
+html.presenting .langswitch.float {
+  top: auto !important; left: auto !important; right: .8rem !important; bottom: .5rem !important; z-index: 31;
+  background: transparent !important; color: #e8eef5 !important; border-color: rgba(255,255,255,.25) !important;
+}
+
+.p-start {
+  position: fixed; right: .9rem; bottom: .9rem; z-index: 20; cursor: pointer;
+  font: 700 .85rem var(--sans, sans-serif); color: #fff; background: var(--ink, #0d1b2a);
+  border: 0; border-radius: 8px; padding: .5rem .8rem; box-shadow: 0 2px 8px rgba(13,27,42,.25);
+}
+.p-start:hover { background: var(--ink-2, #1c2e44); }
+.p-start kbd { font: 600 .72rem var(--mono, monospace); border: 1px solid rgba(255,255,255,.35); border-radius: 4px; padding: 0 .3rem; margin-left: .25rem; }
+
+/* ---------- the live pill ---------- */
+.p-pill {
+  position: fixed; right: .9rem; bottom: .9rem; z-index: 32; display: flex; align-items: center; gap: .4rem;
+  flex-wrap: wrap; justify-content: flex-end; max-width: calc(100vw - 1.8rem);
+  font: 600 .8rem var(--sans, sans-serif); color: var(--ink, #0d1b2a);
+  background: #fff; border: 1px solid var(--line, #d9dfe7); border-radius: 10px; padding: .35rem .45rem;
+  box-shadow: 0 2px 10px rgba(13,27,42,.15);
+}
+.p-pill[hidden] { display: none; }
+/* inside the bar while presenting */
+.p-bar .p-pill { position: static; box-shadow: none; background: transparent; border: 0; padding: 0; color: #e8eef5; flex-wrap: nowrap; }
+.p-bar .p-pill button, .p-bar .p-pill input { background: transparent; color: #e8eef5; border-color: rgba(255,255,255,.25); }
+.p-bar .p-pill button:hover { background: rgba(255,255,255,.1); }
+.p-bar .p-pill input::placeholder { color: #8f9bab; }
+.p-bar .p-pill .p-live, .p-bar .p-pill .p-live b, .p-bar .p-pill .p-laser span { color: #e8eef5; }
+.p-bar .p-pill .p-live.on { color: var(--sig-bright, #3ee0cc); }
+.p-bar .p-pill .p-laser { color: #ff6b6b; }
+.p-bar .p-pill .p-laser.on { background: rgba(255,80,80,.18); border-color: #ff6b6b; }
+html:not(.presenting) body:has(.p-start) .p-pill { bottom: 3.6rem; }
+.p-pill button, .p-pill input {
+  font: inherit; color: inherit; background: var(--soft, #e8ecf1); border: 1px solid var(--line, #d9dfe7);
+  border-radius: 6px; padding: .25rem .55rem; cursor: pointer;
+}
+.p-pill button:hover { background: var(--sig-t, #dcf5f1); }
+.p-pill input { width: 4.2em; cursor: text; background: #fff; font-family: var(--mono, monospace); letter-spacing: .12em; }
+.p-pill form { display: flex; gap: .3rem; margin: 0; }
+.p-pill .p-live { padding: 0 .3rem; color: var(--muted, #5a6779); }
+.p-pill .p-live.on { color: var(--sig-ink, #00695e); }
+.p-pill .p-live.on::before { content: ""; display: inline-block; width: .5rem; height: .5rem; border-radius: 50%; background: var(--bad, #c2352b); margin-right: .35rem; vertical-align: .05rem; animation: p-blink 1.6s infinite; }
+.p-pill .p-live b { font-family: var(--mono, monospace); letter-spacing: .08em; color: var(--ink, #0d1b2a); }
+.p-pill .p-err { color: var(--bad, #c2352b); padding: 0 .3rem; }
+.p-pill .p-laser { color: var(--bad, #c2352b); }
+.p-pill .p-laser span { color: var(--ink, #0d1b2a); margin-left: .25rem; }
+.p-pill .p-laser.on { background: var(--bad-t, #fdebe8); border-color: var(--bad, #c2352b); }
+@keyframes p-blink { 50% { opacity: .3; } }
+
+/* ---------- the laser ---------- */
+.p-dot {
+  position: fixed; left: -8px; top: -8px; width: 16px; height: 16px; border-radius: 50%; z-index: 1000;
+  background: #ff2d2d; box-shadow: 0 0 12px 4px rgba(255, 45, 45, .55); pointer-events: none; display: none;
+  transition: transform 50ms linear;
+}
+.p-dot:not(.far) { transition: none; }
+html.p-lasering, html.p-lasering * { cursor: none !important; }
+@media (prefers-reduced-motion: reduce) { .p-dot { transition: none; } .p-pill .p-live.on::before { animation: none; } }

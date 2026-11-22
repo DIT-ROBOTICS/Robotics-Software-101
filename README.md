@@ -94,7 +94,10 @@ courses/
 ├── assets/            shared look and behaviour (no build step)
 │   ├── lang.js                         English / 中文 switch, loaded by every page
 │   ├── worksheet.css  worksheet.js     the worksheet page
-│   └── walk.css       walk.js          the walkthrough engine
+│   ├── walk.css       walk.js          the walkthrough engine
+│   └── present.css    present.js       slides, laser and live sessions (loaded by the two above)
+├── relay/             the course server: serves the pages and the live-session relay
+├── docker/            the dit-course image every course runs its examples in
 ├── _template/         a complete example course: copy it to start one
 │   ├── index.html     the worksheet
 │   ├── SESSION.md     the presenter's timetable (not shown to members)
@@ -151,6 +154,21 @@ Start from [`_template/index.html`](_template/index.html). Its pieces:
 Write figures as inline SVG by hand, in the actor colours, with an `aria-label` that says what
 the figure shows. Render the page in a browser and look at it before publishing.
 
+## Presenting
+
+Every worksheet is also its own slide deck (`assets/present.js`, loaded by `worksheet.js` and
+`walk.js`; no page includes it by hand). Press **P** or the **Present** button: each `h2` and `h3`
+starts a slide, and the blocks after it are packed onto slides that fit the screen. ← → or a
+clicker move, Esc leaves. Add `data-slide` to a block that should always start a new slide, and
+`data-present="no"` to one that should not be on the slides. **K**
+toggles a laser pointer. There is no second copy of the content, so there is nothing extra to check
+except how the slides are cut: step through them once.
+
+**Live sessions:** in present mode, "Start live" gives a 4-digit PIN. Students press P, type the
+PIN and Join; their page then follows the presenter's slides, walkthrough steps, other pages and
+laser. Scrolling or pressing a key pauses following, and "Follow" catches up. The relay is in
+`relay/`: served from our own server it comes with the pages and needs no setup (see its README).
+
 ## Walkthroughs
 
 A walkthrough is a full-window page in `walk/` that steps through one mechanism, like a
@@ -198,6 +216,8 @@ change both together.
 
 ## Publishing
 
-The repo has no confidential content, so it can be public and served with GitHub Pages
-(Settings → Pages → deploy from the main branch, root folder). Exam material lives in the
+The repo has no confidential content, so it can be public. Serve it from our own server with
+`docker compose -f relay/compose.yaml up -d --build` (one container: the pages and the live-session
+relay; see `relay/README.md`). GitHub Pages works too, but then live sessions need the relay
+hosted elsewhere (the Cloudflare Worker in `relay/`). Exam material lives in the
 separate private `recruit` repo; never copy anything from its `staff/` folder here.

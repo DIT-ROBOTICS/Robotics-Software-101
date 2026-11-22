@@ -410,6 +410,108 @@ lscpu; free -h; df -h /</pre>
 <p lang="en"><b>PPID</b> is the parent's PID. <code>bash</code> (20) started the launcher (36), and the launcher started all three programs. <mark>The launcher is the parent of every node it starts.</mark> Remember that for Part 4.</p>
 <p lang="zh-Hant"><b>PPID</b> 是父 process 的 PID。<code>bash</code>（20）啟動了 launcher（36），launcher 再啟動了三個程式。<mark>launcher 是它啟動的每個 node 的父 process。</mark>第 4 部分會用到這件事。</p>
 
+<h3><span lang="en">Where the output goes: redirection and pipes</span><span lang="zh-Hant">輸出去哪裡：重新導向和 pipe</span></h3>
+<p lang="en">Between <code>fork</code> and <code>exec</code>, the shell sets up three numbered channels that every program starts with: <b>0</b>, input (what you type), <b>1</b>, output (the normal results), and <b>2</b>, errors (error messages and warnings). Normally all three are your terminal. A few symbols tell the shell to connect them somewhere else, and the program never knows:</p>
+<p lang="zh-Hant">在 <code>fork</code> 和 <code>exec</code> 之間，shell 會幫新的 process 接好三個有編號的通道，每個程式一啟動就有：<b>0</b> 是輸入（你打的字），<b>1</b> 是輸出（正常的結果），<b>2</b> 是錯誤（錯誤訊息和警告）。平常三個都接到你的終端機。用幾個符號就能叫 shell 把它們接到別的地方，程式本身完全不知道：</p>
+<table class="t">
+  <tr><th><span lang="en">You type</span><span lang="zh-Hant">你打的</span></th><th><span lang="en">What happens</span><span lang="zh-Hant">會發生什麼</span></th></tr>
+  <tr><td><code>a &gt; file</code></td><td><span lang="en">output (1) goes into <code>file</code>, replacing what was there</span><span lang="zh-Hant">輸出（1）寫進 <code>file</code>，蓋掉原本的內容</span></td></tr>
+  <tr><td><code>a &gt;&gt; file</code></td><td><span lang="en">output (1) is added to the end of <code>file</code></span><span lang="zh-Hant">輸出（1）接在 <code>file</code> 的最後面</span></td></tr>
+  <tr><td><code>a &amp;&gt; file</code></td><td><span lang="en">output <b>and</b> errors go into <code>file</code></span><span lang="zh-Hant">輸出<b>和</b>錯誤都寫進 <code>file</code></span></td></tr>
+  <tr><td><code>a | b</code></td><td><span lang="en">a <b>pipe</b>: the shell starts <code>a</code> and <code>b</code> together, and <code>a</code>'s output (1) becomes <code>b</code>'s input (0)</span><span lang="zh-Hant"><b>pipe</b>：shell 同時啟動 <code>a</code> 和 <code>b</code>，<code>a</code> 的輸出（1）變成 <code>b</code> 的輸入（0）</span></td></tr>
+  <tr><td><code>a |&amp; b</code></td><td><span lang="en">a pipe that carries <code>a</code>'s output <b>and</b> errors</span><span lang="zh-Hant">把 <code>a</code> 的輸出<b>和</b>錯誤都送進去的 pipe</span></td></tr>
+</table>
+<p lang="en">The <code>&amp;</code> means "errors too". Scripts often spell the same thing out as <code>&gt; file 2&gt;&amp;1</code> and <code>2&gt;&amp;1 |</code>; when you see those, read them as <code>&amp;&gt;</code> and <code>|&amp;</code>.</p>
+<p lang="zh-Hant"><code>&amp;</code> 的意思是「錯誤也一起」。腳本裡常把同一件事寫成比較長的 <code>&gt; file 2&gt;&amp;1</code> 和 <code>2&gt;&amp;1 |</code>；看到它們時，就當成 <code>&amp;&gt;</code> 和 <code>|&amp;</code>。</p>
+<figure class="wide">
+<svg class="fig" viewBox="0 0 760 240" role="img" aria-label="Top: a program on its own. Input 0 comes from the keyboard; output 1 and errors 2 both go to the terminal. Bottom: ps piped into grep driver. The pipe joins ps's output 1 to grep's input 0; grep's output goes to the terminal, and the errors of both still go to the terminal.">
+  <defs>
+    <marker id="pp-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="#5a6779"/></marker>
+    <marker id="pp-r" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="#c2352b"/></marker>
+    <marker id="pp-t" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="#0b8f7f"/></marker>
+  </defs>
+  <text x="20" y="26" font-size="13" font-weight="700" fill="#0d1b2a" lang="en">On its own: all three channels are the terminal</text>
+  <text x="20" y="26" font-size="13" font-weight="700" fill="#0d1b2a" lang="zh-Hant">單獨跑：三個通道都是終端機</text>
+  <text x="40" y="75" font-size="13" fill="#5a6779" lang="en">keyboard</text><text x="40" y="75" font-size="13" fill="#5a6779" lang="zh-Hant">鍵盤</text>
+  <path d="M112 70 H246" stroke="#5a6779" stroke-width="1.6" marker-end="url(#pp-a)"/>
+  <text x="180" y="62" font-size="12" fill="#5a6779" text-anchor="middle" lang="en">0 input</text><text x="180" y="62" font-size="12" fill="#5a6779" text-anchor="middle" lang="zh-Hant">0 輸入</text>
+  <rect x="250" y="50" width="100" height="40" rx="6" fill="#e6eefb" stroke="#2266d3" stroke-width="1.5"/>
+  <text x="300" y="75" font-size="14" text-anchor="middle" class="mono" fill="#0d1b2a">ls</text>
+  <path d="M350 62 H546" stroke="#5a6779" stroke-width="1.6" marker-end="url(#pp-a)"/>
+  <text x="448" y="55" font-size="12" fill="#5a6779" text-anchor="middle" lang="en">1 output</text><text x="448" y="55" font-size="12" fill="#5a6779" text-anchor="middle" lang="zh-Hant">1 輸出</text>
+  <path d="M350 80 H546" stroke="#c2352b" stroke-width="1.6" marker-end="url(#pp-r)"/>
+  <text x="448" y="97" font-size="12" fill="#c2352b" text-anchor="middle" lang="en">2 errors</text><text x="448" y="97" font-size="12" fill="#c2352b" text-anchor="middle" lang="zh-Hant">2 錯誤</text>
+  <rect x="550" y="48" width="160" height="44" rx="6" fill="#0d1b2a"/>
+  <text x="630" y="75" font-size="13" text-anchor="middle" fill="#e8eef5" lang="en">terminal</text><text x="630" y="75" font-size="13" text-anchor="middle" fill="#e8eef5" lang="zh-Hant">終端機</text>
+
+  <text x="20" y="132" font-size="13" font-weight="700" fill="#0d1b2a" lang="en">A pipe joins one program's output to the next one's input</text>
+  <text x="20" y="132" font-size="13" font-weight="700" fill="#0d1b2a" lang="zh-Hant">pipe 把一個程式的輸出接到下一個的輸入</text>
+  <text x="20" y="150" font-size="12" class="mono" fill="#5a6779">ps -e -o pid,cmd | grep driver</text>
+  <rect x="40" y="162" width="90" height="40" rx="6" fill="#e6eefb" stroke="#2266d3" stroke-width="1.5"/>
+  <text x="85" y="187" font-size="14" text-anchor="middle" class="mono" fill="#0d1b2a">ps</text>
+  <path d="M130 176 H296" stroke="#0b8f7f" stroke-width="3" marker-end="url(#pp-t)"/>
+  <text x="213" y="169" font-size="12" fill="#0b8f7f" text-anchor="middle" font-weight="700" lang="en">1 → pipe → 0</text><text x="213" y="169" font-size="12" fill="#0b8f7f" text-anchor="middle" font-weight="700" lang="zh-Hant">1 → pipe → 0</text>
+  <rect x="300" y="162" width="130" height="40" rx="6" fill="#e6eefb" stroke="#2266d3" stroke-width="1.5"/>
+  <text x="365" y="187" font-size="14" text-anchor="middle" class="mono" fill="#0d1b2a">grep driver</text>
+  <path d="M430 176 H546" stroke="#5a6779" stroke-width="1.6" marker-end="url(#pp-a)"/>
+  <text x="488" y="169" font-size="12" fill="#5a6779" text-anchor="middle">1</text>
+  <rect x="550" y="158" width="160" height="44" rx="6" fill="#0d1b2a"/>
+  <text x="630" y="185" font-size="13" text-anchor="middle" fill="#e8eef5" lang="en">terminal</text><text x="630" y="185" font-size="13" text-anchor="middle" fill="#e8eef5" lang="zh-Hant">終端機</text>
+  <path d="M85 202 V222 H630 V206" fill="none" stroke="#c2352b" stroke-width="1.4" stroke-dasharray="4 3" marker-end="url(#pp-r)"/>
+  <path d="M365 202 V222" fill="none" stroke="#c2352b" stroke-width="1.4" stroke-dasharray="4 3"/>
+  <text x="200" y="236" font-size="12" fill="#c2352b" lang="en">2 errors of both: still the terminal</text><text x="200" y="236" font-size="12" fill="#c2352b" lang="zh-Hant">兩個的 2 錯誤：還是終端機</text>
+</svg>
+</figure>
+<p lang="en">Output and errors are separate channels, so <code>&gt;</code> catches only the output:</p>
+<p lang="zh-Hant">輸出和錯誤是分開的通道，所以 <code>&gt;</code> 只接得到輸出：</p>
+<pre class="term"><span class="ok">$ ls /code/tiny_shell.c /nope &gt; /tmp/out.txt</span>
+<span class="b">ls: cannot access '/nope': No such file or directory</span>
+<span class="ok">$ cat /tmp/out.txt</span>
+/code/tiny_shell.c
+<span class="ok">$ ls /code/tiny_shell.c /nope &amp;&gt; /tmp/out.txt</span>
+<span class="ok">$ cat /tmp/out.txt</span>
+ls: cannot access '/nope': No such file or directory
+/code/tiny_shell.c</pre>
+<p lang="en">This matters for ROS, because <mark>a node writes its log to errors (2), not to output (1)</mark>. Save a node's log with <code>&gt;</code> alone, and the log stays on the screen while the file stays empty:</p>
+<p lang="zh-Hant">這對 ROS 很重要，因為 <mark>node 的 log 是寫到錯誤（2），不是輸出（1）</mark>。只用 <code>&gt;</code> 存 node 的 log，log 會留在螢幕上，檔案卻是空的：</p>
+<pre class="term"><span class="ok">$ python3 monitor.py &gt; /tmp/monitor.log</span>     <span class="m"># Ctrl+C after two seconds</span>
+[INFO] [1795359247.531945339] [monitor]: ticks = None
+[INFO] [1795359248.515822454] [monitor]: ticks = None
+<span class="ok">$ cat /tmp/monitor.log</span>
+<span class="ok">$ python3 monitor.py &amp;&gt; /tmp/monitor.log</span>     <span class="m"># nothing on the screen this time</span>
+<span class="ok">$ head -2 /tmp/monitor.log</span>
+[INFO] [1795359863.838187073] [monitor]: ticks = None
+[INFO] [1795359864.821016638] [monitor]: ticks = None</pre>
+<p lang="en">A pipe hands one program's output to the next. You have seen it with <code>grep</code>, which keeps only the lines that contain a word. Both programs run at the same time, so <code>grep</code> finds itself in the list too. (Part 5 writes <code>grep [h]eartbeat</code> to hide that line: the pattern still matches <code>heartbeat</code>, but <code>grep</code>'s own command line no longer contains that word.)</p>
+<p lang="zh-Hant">pipe 把一個程式的輸出交給下一個。你看過它跟 <code>grep</code> 一起用：<code>grep</code> 只留下含某個字的行。兩個程式同時在跑，所以 <code>grep</code> 也會在清單裡找到它自己。（第 5 部分寫成 <code>grep [h]eartbeat</code> 來藏掉這一行：這個樣式還是會比對到 <code>heartbeat</code>，但 <code>grep</code> 自己的指令列裡已經沒有這個字了。）</p>
+<pre class="term"><span class="ok">$ ps -e -o pid,cmd | grep driver</span>
+     31 python3 /code/driver.py
+     62 grep driver</pre>
+<p lang="en">To save a log and still watch it, pipe it into <code>tee</code>, which writes what it reads both to the screen and to a file. Use <code>|&amp;</code>, so the errors go into the pipe too. <mark>This is the usual way to keep the log of a robot run:</mark></p>
+<p lang="zh-Hant">想存 log 又想同時看到，就 pipe 給 <code>tee</code>：它把讀到的東西同時寫到螢幕和檔案。用 <code>|&amp;</code>，錯誤才會一起進 pipe。<mark>這是保存機器人執行 log 最常見的做法：</mark></p>
+<pre class="term"><span class="ok">$ ros2 launch robot.launch.py |&amp; tee /tmp/run.log</span>
+[INFO] [launch]: All log files can be found below /root/.ros/log/2026-11-22-15-04-25-278690-91aa42cbd368-39
+[INFO] [launch]: Default logging verbosity is set to INFO
+[INFO] [python3-1]: process started with pid [41]
+[python3-1] fake_mcu: /tmp/mcu -&gt; /dev/pts/0
+<span class="m">...</span>
+<span class="a">[python3-3] [INFO] [1795359868.434223491] [monitor]: ticks = 133</span>
+<span class="m"># Ctrl+C; every line above is also in /tmp/run.log</span>
+<span class="ok">$ wc -l /tmp/run.log</span>
+9 /tmp/run.log</pre>
+<p lang="en">Over SSH there is no file manager, so two patterns do most of the finding. <code>find</code> searches a folder and everything inside it: <code>-type f</code> keeps only files, and <code>-name</code> takes a pattern in quotes, where <code>*</code> means "any characters". <code>ls … | grep</code> filters a listing, and <code>grep</code> takes a plain word, without <code>*</code>:</p>
+<p lang="zh-Hant">透過 SSH 沒有檔案總管可以用，大部分的「找東西」靠兩個寫法。<code>find</code> 會搜尋一個資料夾和裡面的所有東西：<code>-type f</code> 只留檔案，<code>-name</code> 接一個加引號的樣式，<code>*</code> 代表「任何字元」。<code>ls … | grep</code> 是過濾一份清單，<code>grep</code> 接的是一個單純的字，不加 <code>*</code>：</p>
+<pre class="term"><span class="ok">$ find /code -type f -name "*launch*"</span>
+/code/loop_driver.launch.py
+/code/robot.launch.py
+<span class="ok">$ ls /opt/ros/humble/lib | grep rclcpp</span>
+librclcpp.so
+librclcpp_action.so
+librclcpp_lifecycle.so
+rclcpp_components</pre>
+<p lang="en">On a robot, <code>ls /dev | grep ACM</code> finds the serial port of a USB board, such as <code>ttyACM0</code>.</p>
+<p lang="zh-Hant">在機器人上，<code>ls /dev | grep ACM</code> 可以找到 USB 板子的序列埠，例如 <code>ttyACM0</code>。</p>
+
 <h3><span lang="en">/proc: ask the kernel</span><span lang="zh-Hant">/proc：直接問核心</span></h3>
 <p lang="en">Where did <code>ps</code> get those PIDs and parents? From the <span class="who os">kernel</span>, which keeps a record of every process and shows it as files in <code>/proc</code>: one folder per PID.</p>
 <p lang="zh-Hant"><code>ps</code> 是從哪裡拿到這些 PID 和父 process 的？從<span class="who os">核心</span>。核心幫每個 process 留著紀錄，並把它當成檔案放在 <code>/proc</code> 裡：每個 PID 一個資料夾。</p>
@@ -1003,6 +1105,7 @@ lr-x------ 1 root root 64 Nov 20 09:29 11 -> /dev/shm/fastrtps_port7413_el
 <p lang="zh-Hant">不看這一頁也能跟隊友解釋清楚的，就打勾。</p>
 <ul class="goals">
   <li><span lang="en">I can say the difference between a program and a process, and find a node's PID and parent with <code>ps</code>, and say what <code>fork</code>, <code>exec</code> and <code>wait</code> each do.</span><span lang="zh-Hant">我能說出程式和 process 的差別，並用 <code>ps</code> 找到 node 的 PID 和父 process，也能說出 <code>fork</code>、<code>exec</code>、<code>wait</code> 各做什麼。</span></li>
+  <li><span lang="en">I can send a program's output and errors to a file, and save a node's log while still watching it, with <code>|&amp; tee</code>.</span><span lang="zh-Hant">我能把程式的輸出和錯誤寫進檔案，也能用 <code>|&amp; tee</code> 一邊看 node 的 log 一邊存下來。</span></li>
   <li><span lang="en">I can explain why <code>kill</code> on a launcher can leave its nodes running, and what PID 1 has to do with it.</span><span lang="zh-Hant">我能解釋為什麼對 launcher 下 <code>kill</code> 可能讓它的 node 繼續跑，以及這跟 PID 1 有什麼關係。</span></li>
   <li><span lang="en">I can name SIGINT, SIGTERM, SIGHUP and SIGKILL, what sends each one, and which one can't be caught.</span><span lang="zh-Hant">我能說出 SIGINT、SIGTERM、SIGHUP 和 SIGKILL，各是誰送的，以及哪一個接不住。</span></li>
   <li><span lang="en">I can explain why a launch dies when SSH drops, and why it survives inside tmux.</span><span lang="zh-Hant">我能解釋為什麼 SSH 斷線時 launch 會死，以及為什麼在 tmux 裡就不會。</span></li>

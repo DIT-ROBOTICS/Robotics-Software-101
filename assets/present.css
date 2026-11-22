@@ -3,6 +3,8 @@
 /* ---------- present mode: the page becomes one slide at a time ---------- */
 html.presenting { font-size: clamp(16px, 1.4vw, 28px); }
 html.presenting body { overflow: hidden; padding-left: 0 !important; }
+/* a sideways swipe moves a slide (present.js), not back in history: the browser only scrolls along the slide's height */
+html.presenting, html.presenting body, html.presenting .ws { overscroll-behavior: none; touch-action: pan-y; }
 html.presenting nav.map, html.presenting .p-start { display: none !important; }
 html.presenting .ws {
   position: fixed; inset: 0 0 3.1rem 0; max-width: none; margin: 0; overflow: auto;
@@ -42,6 +44,25 @@ html.presenting .langswitch.float {
 }
 .p-start:hover { background: var(--ink-2, #1c2e44); }
 .p-start kbd { font: 600 .72rem var(--mono, monospace); border: 1px solid rgba(255,255,255,.35); border-radius: 4px; padding: 0 .3rem; margin-left: .25rem; }
+
+/* ---------- phones ---------- */
+@media (max-width: 600px), (max-height: 500px) {
+  html.presenting { font-size: 13px; }
+  html.presenting .ws { padding: 1rem 1.4rem; }
+  html.presenting .ws h2 { font-size: 1.6rem; }
+  .p-bar { gap: .4rem; padding-right: 4.6rem; }
+}
+/* a phone held upright: lay the slides sideways, so turning the phone reads them (works with
+   rotation lock on, too). The fixed slide area and bar are placed inside the rotated body. */
+@media (orientation: portrait) and (max-width: 600px) {
+  html.presenting, html.presenting body { overflow: hidden; height: 100%; }
+  html.presenting body {
+    position: fixed; top: 0; left: 0; margin: 0;
+    width: 100vh; width: 100dvh; height: 100vw;
+    transform-origin: top left; transform: translateX(100vw) rotate(90deg);
+  }
+  html.presenting, html.presenting body, html.presenting .ws { touch-action: pan-x; }   /* turned: the slide's height runs across the glass */
+}
 
 /* ---------- the laser button (in the bar while presenting, floating on walkthroughs) ---------- */
 .p-pill {

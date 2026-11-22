@@ -180,6 +180,17 @@
     else if (k === 'End') show(slides.length - 1);
     else if (k === 'Escape' || k === 'p' || k === 'P') leave();
   }, true);
+  // phones: swipe left for the next slide, right for the previous. On a phone held upright the slides
+  // are turned 90° (present.css), so "left" on the slide is "up" on the glass.
+  const turned = matchMedia('(orientation: portrait) and (max-width: 600px)');
+  let touch = null;
+  document.addEventListener('touchstart', ev => { if (presenting && ev.touches.length === 1) touch = [ev.touches[0].clientX, ev.touches[0].clientY]; }, { passive: true });
+  document.addEventListener('touchend', ev => {
+    if (!presenting || !touch) return;
+    const t = ev.changedTouches[0], dx = t.clientX - touch[0], dy = t.clientY - touch[1]; touch = null;
+    const along = turned.matches ? dy : dx, across = turned.matches ? dx : dy;   // along the slide's width
+    if (Math.abs(along) > 50 && Math.abs(along) > 2 * Math.abs(across)) show(cur + (along < 0 ? 1 : -1));
+  }, { passive: true });
   window.addEventListener('resize', () => { if (presenting) { const pid = +slides[cur].items[0].dataset.pid; build(pid); show(cur); } });
 
   /* ================= start ================= */
